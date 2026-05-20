@@ -49,18 +49,18 @@ export const api = {
     request(`/api/positions/${id}`, { method: "PUT", body: JSON.stringify(data) }) as Promise<Position>,
   deletePosition: (id: number) =>
     request(`/api/positions/${id}`, { method: "DELETE" }),
-  analyzeAll: (model: "qwen" | "deepseek" = "qwen") =>
+  analyzeAll: (model: "qwen" | "deepseek" | "gemini" = "qwen") =>
     request(`/api/analysis/all?model=${model}`, { method: "POST" }) as Promise<AnalysisResult[]>,
-  analyzeSingle: (symbol: string, model: "qwen" | "deepseek" = "qwen") =>
+  analyzeSingle: (symbol: string, model: "qwen" | "deepseek" | "gemini" = "qwen") =>
     request(`/api/analysis/${symbol}?model=${model}`, { method: "POST" }) as Promise<AnalysisResult>,
-  getChatHistory: (model: "qwen" | "deepseek") =>
+  getChatHistory: (model: "qwen" | "deepseek" | "gemini") =>
     request(`/api/chat?model=${model}`) as Promise<{ id: number; model: string; role: string; content: string; created_at: string }[]>,
-  sendChatMessage: (model: "qwen" | "deepseek", message: string, enableSearch: boolean = false) =>
+  sendChatMessage: (model: "qwen" | "deepseek" | "gemini", message: string, enableSearch: boolean = false) =>
     request("/api/chat", {
       method: "POST",
       body: JSON.stringify({ model, message, enable_search: enableSearch }),
     }) as Promise<{ reply: string }>,
-  clearChatHistory: (model: "qwen" | "deepseek") =>
+  clearChatHistory: (model: "qwen" | "deepseek" | "gemini") =>
     request(`/api/chat?model=${model}`, { method: "DELETE" }),
 };
 
@@ -80,11 +80,11 @@ export async function login(account: string, password: string) {
   return data.user;
 }
 
-export async function register(account: string, password: string, nickname: string) {
+export async function register(account: string, password: string, nickname: string, agreeTerms: boolean) {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ account, password, nickname }),
+    body: JSON.stringify({ account, password, nickname, agree_terms: agreeTerms }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "请求失败" }));
@@ -110,6 +110,25 @@ export function getUser() {
 export function getToken() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("token");
+}
+
+// 记录同意协议
+export async function agreeTermsApi() {
+  const token = getToken();
+  await fetch(`${API_BASE}/api/auth/me/agree-terms`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+}
+
+// 获取用户信息（含协议同意状态）
+export async function fetchMe() {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error("获取用户信息失败");
+  return res.json() as Promise<{ id: number; account: string; nickname: string; agreed_terms_at: string | null }>;
 }
 
 // --- 订阅相关 ---
@@ -159,3 +178,10 @@ export const subscriptionApi = {
     }),
   getUsage: () => request("/api/subscription/usage") as Promise<UsageStats>,
 };
+
+// --- 环境信息 ---
+export async function getEnvInfo(): Promise<{ env: string; database_type: string; is_prod: boolean }> {
+  const res = await fetch(`${API_BASE}/api/env`);
+  if (!res.ok) return { env: "unknown", database_type: "unknown", is_prod: false };
+  return res.json();
+}

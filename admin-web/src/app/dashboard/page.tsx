@@ -29,13 +29,13 @@ export default function DashboardPage() {
         <div className="card animate-fade-in" style={{ marginTop: 32, padding: 24 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>今日调用量分布</h3>
           <div style={{ display: "flex", gap: 32 }}>
-            {Object.entries(stats.by_action_type).map(([type, count]: [string, number]) => (
+            {Object.entries(stats.by_action_type as Record<string, number>).map(([type, count]) => (
               <div key={type} style={{ flex: 1, textAlign: "center" }}>
                 <div style={{ height: 120, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
                   <div style={{
                     width: 60, borderRadius: "6px 6px 0 0",
                     background: "linear-gradient(180deg, var(--accent), rgba(99, 102, 241, 0.3))",
-                    height: `${Math.max(20, (count / Math.max(...Object.values(stats.by_action_type))) * 100)}px`,
+                    height: `${Math.max(20, (count / Math.max(...(Object.values(stats.by_action_type) as number[]))) * 100)}px`,
                     transition: "height 0.5s ease",
                   }} />
                 </div>

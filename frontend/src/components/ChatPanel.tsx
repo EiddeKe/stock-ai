@@ -26,7 +26,7 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
   const fetchHistory = useCallback(async (m: "qwen" | "deepseek" | "gemini") => {
     try {
       const data = await api.getChatHistory(m);
-      setMessages(data);
+      setMessages(data.map((m) => ({ ...m, role: m.role === "user" ? "user" as const : "assistant" as const })));
     } catch {
       setMessages([]);
     }

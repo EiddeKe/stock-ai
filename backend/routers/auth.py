@@ -1,6 +1,7 @@
 """认证 API"""
 import re
 from fastapi import APIRouter, Depends, HTTPException, Header
+from datetime import datetime
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
@@ -41,6 +42,7 @@ class RegisterReq(BaseModel):
     account: str
     password: str
     nickname: str
+    agree_terms: bool = False
 
 
 class LoginReq(BaseModel):
@@ -51,6 +53,8 @@ class LoginReq(BaseModel):
 @router.post("/register")
 def register(req: RegisterReq, db: Session = Depends(get_db)):
     """注册新用户"""
+    if not req.agree_terms:
+        raise HTTPException(status_code=400, detail="请先阅读并同意用户协议和隐私政策")
     if not validate_account(req.account):
         raise HTTPException(status_code=400, detail="请输入正确的手机号或邮箱")
     if len(req.password) < 6:
@@ -59,7 +63,11 @@ def register(req: RegisterReq, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="昵称最多 20 个字符")
     if db.query(User).filter(User.account == req.account).first():
         raise HTTPException(status_code=400, detail="该账号已被注册")
-    user = User(account=req.account, nickname=req.nickname, hashed_pwd=hash_password(req.password))
+    user = User(
+        account=req.account,
+        nickname=req.nickname,
+        hashed_pwd=hash_password(req.password),
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -78,7 +86,20 @@ def login(req: LoginReq, db: Session = Depends(get_db)):
 @router.get("/me")
 def me(user: User = Depends(lambda db, token: get_current_user(token, db))):
     """获取当前用户信息"""
-    return {"id": user.id, "account": user.account, "nickname": user.nickname}
+    return {
+        "id": user.id,
+        "account": user.account,
+        "nickname": user.nickname,
+        "agreed_terms_at": user.agreed_terms_at.isoformat() if user.agreed_terms_at else None,
+    }
+
+
+@router.post("/me/agree-terms")
+def agree_terms(user: User = Depends(lambda db, token: get_current_user(token, db)), db: Session = Depends(get_db)):
+    """记录用户同意协议和隐私政策"""
+    user.agreed_terms_at = datetime.now()
+    db.commit()
+    return {"message": "已记录"}
 
 
 @router.put("/me")
