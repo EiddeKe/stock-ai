@@ -1,16 +1,21 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-const ADMIN_TOKEN = "admin123";
 
 async function request(url: string, options?: RequestInit) {
+  const token = localStorage.getItem("admin_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ADMIN_TOKEN}`,
-      ...options?.headers,
-    },
+    headers: { ...headers, ...options?.headers },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem("admin_token");
+      window.location.href = "/admin/login";
+    }
     const err = await res.json().catch(() => ({ detail: "请求失败" }));
     throw new Error(err.detail || "请求失败");
   }
@@ -53,7 +58,25 @@ export interface UserInfo {
   updated_at: string | null;
 }
 
+export interface AdminInfo {
+  id: number;
+  account: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export const adminApi = {
+  // 认证
+  login: (account: string, password: string) =>
+    request("/api/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ account, password }),
+    }) as Promise<{ token: string; account: string; role: string }>,
+
+  getMyInfo: () => request("/api/admin/me") as Promise<AdminInfo>,
+
+  // 用户管理
   listUsers: (page: number, keyword: string) =>
     request(`/api/admin/users?page=${page}&page_size=20&keyword=${encodeURIComponent(keyword)}`),
   createUser: (data: { account: string; password: string; nickname: string }) =>
@@ -63,6 +86,7 @@ export const adminApi = {
   deleteUser: (id: number) =>
     request(`/api/admin/users/${id}`, { method: "DELETE" }),
 
+  // 套餐管理
   listPlans: () => request("/api/admin/plans") as Promise<AdminPlan[]>,
   createPlan: (data: PlanInput) =>
     request("/api/admin/plans", { method: "POST", body: JSON.stringify(data) }) as Promise<AdminPlan>,
@@ -71,15 +95,14 @@ export const adminApi = {
   deletePlan: (id: number) =>
     request(`/api/admin/plans/${id}`, { method: "DELETE" }),
 
+  // 用量统计
   getUsageStats: () => request("/api/admin/plans/stats"),
+  getUsageByUser: (page: number) =>
+    request(`/api/admin/plans/stats/users?page=${page}&page_size=20`),
 };
 
-export function loginAdmin(password: string): boolean {
-  if (password === ADMIN_TOKEN) {
-    localStorage.setItem("admin_token", ADMIN_TOKEN);
-    return true;
-  }
-  return false;
+export function setAdminToken(token: string) {
+  localStorage.setItem("admin_token", token);
 }
 
 export function isAdminLoggedIn(): boolean {
