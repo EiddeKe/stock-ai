@@ -36,11 +36,12 @@ interface AnalysisResult {
   risk_tip: string;
 }
 
-type ModelType = "qwen" | "deepseek";
+type ModelType = "qwen" | "deepseek" | "gemini";
 
 const MODEL_CONFIG: Record<ModelType, { label: string; icon: string }> = {
   qwen: { label: "千问分析", icon: "✦" },
   deepseek: { label: "DeepSeek分析", icon: "◆" },
+  gemini: { label: "Gemini分析", icon: "●" },
 };
 
 export default function StockAnalysisPage() {
@@ -48,21 +49,25 @@ export default function StockAnalysisPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [qwenAnalyses, setQwenAnalyses] = useState<AnalysisResult[]>([]);
   const [deepseekAnalyses, setDeepseekAnalyses] = useState<AnalysisResult[]>([]);
+  const [geminiAnalyses, setGeminiAnalyses] = useState<AnalysisResult[]>([]);
   const [activeModel, setActiveModel] = useState<ModelType>("qwen");
   const [chatModel, setChatModel] = useState<ModelType>("qwen");
   const [qwenEnableSearch, setQwenEnableSearch] = useState(false);
   const [deepseekEnableSearch, setDeepseekEnableSearch] = useState(false);
+  const [geminiEnableSearch, setGeminiEnableSearch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [deepseekLoading, setDeepseekLoading] = useState(false);
+  const [geminiLoading, setGeminiLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editPositionId, setEditPositionId] = useState<number | null>(null);
   const hasLoadedOnce = useRef(false);
 
-  const analyses = activeModel === "qwen" ? qwenAnalyses : deepseekAnalyses;
+  const analyses = activeModel === "qwen" ? qwenAnalyses : activeModel === "deepseek" ? deepseekAnalyses : geminiAnalyses;
   const hasDeepseek = deepseekAnalyses.length > 0;
+  const hasGemini = geminiAnalyses.length > 0;
 
   const fetchPositions = useCallback(async (silent = false) => {
     if (!silent) {
@@ -125,6 +130,7 @@ export default function StockAnalysisPage() {
       await api.deletePosition(id);
       setQwenAnalyses([]);
       setDeepseekAnalyses([]);
+      setGeminiAnalyses([]);
       setActiveModel("qwen");
       fetchPositions();
     } catch (e: any) {
@@ -139,6 +145,7 @@ export default function StockAnalysisPage() {
       setQwenAnalyses(results);
       setActiveModel("qwen");
       setDeepseekAnalyses([]);
+      setGeminiAnalyses([]);
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -159,10 +166,26 @@ export default function StockAnalysisPage() {
     }
   };
 
+  const handleAnalyzeGemini = async () => {
+    if (hasGemini) return;
+    setGeminiLoading(true);
+    try {
+      const results = await api.analyzeAll("gemini");
+      setGeminiAnalyses(results);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setGeminiLoading(false);
+    }
+  };
+
   const handleModelSwitch = (model: ModelType) => {
     setActiveModel(model);
     if (model === "deepseek" && !hasDeepseek) {
       handleAnalyzeDeepSeek();
+    }
+    if (model === "gemini" && !hasGemini) {
+      handleAnalyzeGemini();
     }
   };
 
@@ -260,7 +283,7 @@ export default function StockAnalysisPage() {
             display: "flex", alignItems: "center", gap: 4, padding: "8px 12px",
             borderBottom: "1px solid var(--border)",
           }}>
-            {(["qwen", "deepseek"] as ModelType[]).map((model) => {
+            {(["qwen", "deepseek", "gemini"] as ModelType[]).map((model) => {
               const cfg = MODEL_CONFIG[model];
               const isActive = chatModel === model;
               return (
@@ -296,8 +319,8 @@ export default function StockAnalysisPage() {
           {/* 对话内容 */}
           <ChatPanel
             model={chatModel}
-            enableSearch={chatModel === "qwen" ? qwenEnableSearch : deepseekEnableSearch}
-            onEnableSearchChange={chatModel === "qwen" ? setQwenEnableSearch : setDeepseekEnableSearch}
+            enableSearch={chatModel === "qwen" ? qwenEnableSearch : chatModel === "deepseek" ? deepseekEnableSearch : geminiEnableSearch}
+            onEnableSearchChange={chatModel === "qwen" ? setQwenEnableSearch : chatModel === "deepseek" ? setDeepseekEnableSearch : setGeminiEnableSearch}
           />
         </div>
 
@@ -378,7 +401,7 @@ export default function StockAnalysisPage() {
           )}
 
           {/* AI 分析结果（带模型切换 Tab） */}
-          {(qwenAnalyses.length > 0 || deepseekAnalyses.length > 0) && (
+          {(qwenAnalyses.length > 0 || deepseekAnalyses.length > 0 || geminiAnalyses.length > 0) && (
             <div className="animate-fade-in">
               {/* 模型切换 Tab */}
               <div style={{
@@ -386,10 +409,10 @@ export default function StockAnalysisPage() {
                 background: "var(--bg-primary)", borderRadius: 10, padding: 4,
                 border: "1px solid var(--border)", width: "fit-content",
               }}>
-                {(["qwen", "deepseek"] as ModelType[]).map((model) => {
+                {(["qwen", "deepseek", "gemini"] as ModelType[]).map((model) => {
                   const cfg = MODEL_CONFIG[model];
                   const isActive = activeModel === model;
-                  const isLoading = model === "deepseek" && deepseekLoading;
+                  const isLoading = model === "deepseek" ? deepseekLoading : model === "gemini" ? geminiLoading : false;
                   return (
                     <button
                       key={model}
@@ -404,7 +427,7 @@ export default function StockAnalysisPage() {
                       }}
                     >
                       {isLoading ? (
-                        <><span className="loading-spinner" style={{ marginRight: 6 }} /> {cfg.label}分析中</>
+                        <><span className="loading-spinner" style={{ marginRight: 6 }} /> {cfg.label}中</>
                       ) : (
                         <>{cfg.icon} {cfg.label}</>
                       )}

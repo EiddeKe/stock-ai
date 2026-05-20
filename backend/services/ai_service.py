@@ -1,8 +1,8 @@
-"""AI 分析服务 - 通义千问 & DeepSeek"""
+"""AI 分析服务 - 通义千问 & DeepSeek & Gemini"""
 import json
 from dashscope import Generation
 import dashscope
-from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY
+from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY
 
 
 def build_analysis_prompt(
@@ -61,6 +61,8 @@ def analyze_stock(
 
     if model == "deepseek":
         return _analyze_with_deepseek(prompt)
+    if model == "gemini":
+        return _analyze_with_gemini(prompt)
     return _analyze_with_qwen(prompt)
 
 
@@ -114,6 +116,31 @@ def _analyze_with_deepseek(prompt: str) -> dict:
     except Exception as e:
         print(f"DeepSeek分析出错: {e}")
         return _fallback_result(f"DeepSeek API 调用失败: {e}")
+
+
+def _analyze_with_gemini(prompt: str) -> dict:
+    """Gemini 分析"""
+    if not GOOGLE_API_KEY:
+        return _fallback_result("未配置 Google Gemini API Key")
+
+    try:
+        from google import genai
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                {"role": "user", "parts": [{"text": "你是一位专业的A股交易分析师，擅长技术分析。请用JSON格式回答。"}]},
+                {"role": "model", "parts": [{"text": "好的，我会用JSON格式返回分析结果。"}]},
+                {"role": "user", "parts": [{"text": prompt}]},
+            ],
+        )
+        content = response.text.strip()
+        return _parse_json(content)
+    except ImportError:
+        return _fallback_result("未安装 google-genai 库，请 pip install google-genai")
+    except Exception as e:
+        print(f"Gemini分析出错: {e}")
+        return _fallback_result(f"Gemini API 调用失败: {e}")
 
 
 def _parse_json(content: str) -> dict:

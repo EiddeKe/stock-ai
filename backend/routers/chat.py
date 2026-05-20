@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/chat", tags=["AI对话"])
 
 @router.get("", response_model=list[ChatMessageResponse])
 def get_chat_history(
-    model: str = Query(..., description="模型: qwen/deepseek"),
+    model: str = Query(..., description="模型: qwen/deepseek/gemini"),
     db: Session = Depends(get_db),
     token: str = Depends(auth_header),
 ):
@@ -35,7 +35,7 @@ def send_message(
     token: str = Depends(auth_header),
 ):
     """发送消息给 AI"""
-    if data.model not in ("qwen", "deepseek"):
+    if data.model not in ("qwen", "deepseek", "gemini"):
         raise HTTPException(status_code=400, detail="不支持的模型")
 
     current_user = get_current_user(token, db)
@@ -95,7 +95,7 @@ def send_message(
 
 @router.delete("")
 def clear_chat_history(
-    model: str = Query(..., description="模型: qwen/deepseek"),
+    model: str = Query(..., description="模型: qwen/deepseek/gemini"),
     db: Session = Depends(get_db),
     token: str = Depends(auth_header),
 ):

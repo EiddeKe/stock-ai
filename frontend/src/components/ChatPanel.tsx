@@ -10,7 +10,7 @@ interface ChatMsg {
 }
 
 interface Props {
-  model: "qwen" | "deepseek";
+  model: "qwen" | "deepseek" | "gemini";
   enableSearch: boolean;
   onEnableSearchChange: (v: boolean) => void;
 }
@@ -23,7 +23,7 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
   const containerRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef(model);
 
-  const fetchHistory = useCallback(async (m: "qwen" | "deepseek") => {
+  const fetchHistory = useCallback(async (m: "qwen" | "deepseek" | "gemini") => {
     try {
       const data = await api.getChatHistory(m);
       setMessages(data);

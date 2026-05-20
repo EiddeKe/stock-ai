@@ -4,7 +4,7 @@ import time
 import requests
 from dashscope import Generation
 import dashscope
-from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY
+from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY
 from services.indicator_service import calc_indicators
 from services.quote_service import get_daily_kline
 
@@ -175,6 +175,35 @@ def _analyze_sector_deepseek(prompt: str, sector_name: str, sector_change: float
         return _fallback_sector(sector_name, sector_change, stocks)
 
 
+def _analyze_sector_gemini(prompt: str, sector_name: str, sector_change: float, stocks: list[dict]) -> dict:
+    """Gemini 分析行业推荐"""
+    if not GOOGLE_API_KEY:
+        return _fallback_sector(sector_name, sector_change, stocks)
+
+    try:
+        from google import genai
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                {"role": "user", "parts": [{"text": "你是一位专业的A股行业研究分析师，擅长基本面分析和技术面结合。请用JSON格式回答。"}]},
+                {"role": "model", "parts": [{"text": "好的，我会用JSON格式返回行业分析结果。"}]},
+                {"role": "user", "parts": [{"text": prompt}]},
+            ],
+        )
+        content = response.text.strip()
+        if "```" in content:
+            content = content.split("```json")[-1].split("```")[0].strip()
+        elif "{" in content:
+            content = content[content.find("{"):content.rfind("}") + 1]
+        return json.loads(content)
+    except ImportError:
+        return _fallback_sector(sector_name, sector_change, stocks)
+    except Exception as e:
+        print(f"Gemini分析行业失败: {e}")
+        return _fallback_sector(sector_name, sector_change, stocks)
+
+
 def _fallback_sector(sector_name: str, sector_change: float, stocks: list[dict]) -> dict:
     """LLM 失败时的兜底推荐"""
     return {
@@ -214,6 +243,8 @@ def analyze_sector_with_llm(sector_name: str, sector_change: float, stocks: list
 
     if model == "deepseek":
         return _analyze_sector_deepseek(prompt, sector_name, sector_change, stocks)
+    if model == "gemini":
+        return _analyze_sector_gemini(prompt, sector_name, sector_change, stocks)
     return _analyze_sector_qwen(prompt, sector_name, sector_change, stocks)
 
 

@@ -4,6 +4,7 @@ sqlalchemy>=2.0.0
 akshare>=1.14.0
 dashscope>=1.20.0
 openai>=1.0.0
+google-genai>=1.0.0
 pandas>=2.0.0
 apscheduler>=3.10.0
 python-jose[cryptography]>=3.3.0

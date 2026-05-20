@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, SessionLocal, Base
 from models import User
 from services.auth_service import hash_password
-from routers import positions, analysis, recommendation, chat, auth
+from routers import positions, analysis, recommendation, chat, auth, admin
 from scheduler import start_scheduler
 
 
@@ -58,6 +58,7 @@ app.include_router(positions.router)
 app.include_router(analysis.router)
 app.include_router(recommendation.router)
 app.include_router(chat.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")

@@ -1,8 +1,8 @@
-"""AI 对话服务 — 支持千问/DeepSeek 多轮对话 + 联网搜索"""
+"""AI 对话服务 — 支持千问/DeepSeek/Gemini 多轮对话 + 联网搜索"""
 import json
 import time
 import requests
-from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY
+from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY
 from dashscope import Generation
 
 
@@ -129,6 +129,40 @@ def _chat_with_deepseek(messages: list[dict], search_context: str = "") -> str:
         return "抱歉，DeepSeek 暂时无法回复，请稍后再试。"
 
 
+def _chat_with_gemini(messages: list[dict], search_context: str = "") -> str:
+    if not GOOGLE_API_KEY:
+        return "请先配置 GOOGLE_API_KEY 环境变量。"
+    try:
+        from google import genai
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+
+        # 将 OpenAI 风格消息转为 Gemini 格式
+        contents = []
+        system_text = messages[0]["content"] if messages else ""
+        if search_context:
+            system_text += f"\n\n【实时搜索资讯】\n{search_context}"
+        if system_text:
+            contents.append({"role": "user", "parts": [{"text": system_text}]})
+            contents.append({"role": "model", "parts": [{"text": "好的，我会结合上下文进行回答。"}]})
+
+        for m in messages[1:]:
+            contents.append({
+                "role": "user" if m["role"] == "user" else "model",
+                "parts": [{"text": m["content"]}],
+            })
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+        )
+        return response.text.strip()
+    except ImportError:
+        return "请先安装 google-genai 包: pip install google-genai"
+    except Exception as e:
+        print(f"Gemini 对话失败: {e}")
+        return "抱歉，Gemini 暂时无法回复，请稍后再试。"
+
+
 def chat(
     model: str,
     positions_context: str,
@@ -147,6 +181,11 @@ def chat(
 
     if model == "deepseek":
         return _chat_with_deepseek(
+            build_chat_messages(positions_context, history, user_message, search_context),
+            search_context,
+        )
+    if model == "gemini":
+        return _chat_with_gemini(
             build_chat_messages(positions_context, history, user_message, search_context),
             search_context,
         )

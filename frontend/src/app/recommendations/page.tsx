@@ -25,11 +25,12 @@ interface SectorRecommendation {
   stock_recommendations: StockRecommendation[];
 }
 
-type ModelType = "qwen" | "deepseek";
+type ModelType = "qwen" | "deepseek" | "gemini";
 
 const MODEL_CONFIG: Record<ModelType, { label: string; icon: string }> = {
   qwen: { label: "千问推荐", icon: "✦" },
   deepseek: { label: "DeepSeek推荐", icon: "◆" },
+  gemini: { label: "Gemini推荐", icon: "●" },
 };
 
 export default function RecommendationsPage() {
@@ -37,9 +38,11 @@ export default function RecommendationsPage() {
   const [sectors, setSectors] = useState<SectorRecommendation[]>([]);
   const [qwenSectors, setQwenSectors] = useState<SectorRecommendation[]>([]);
   const [deepseekSectors, setDeepseekSectors] = useState<SectorRecommendation[]>([]);
+  const [geminiSectors, setGeminiSectors] = useState<SectorRecommendation[]>([]);
   const [activeModel, setActiveModel] = useState<ModelType>("qwen");
   const [loading, setLoading] = useState(false);
   const [deepseekLoading, setDeepseekLoading] = useState(false);
+  const [geminiLoading, setGeminiLoading] = useState(false);
   const [error, setError] = useState("");
   const [expandedSector, setExpandedSector] = useState<string | null>(null);
   const [pageLoaded, setPageLoaded] = useState(false);
@@ -48,7 +51,8 @@ export default function RecommendationsPage() {
     if (!isSwitch) {
       setLoading(true);
     } else {
-      setDeepseekLoading(true);
+      if (model === "deepseek") setDeepseekLoading(true);
+      if (model === "gemini") setGeminiLoading(true);
     }
     setError("");
     try {
@@ -57,21 +61,24 @@ export default function RecommendationsPage() {
       const json = await res.json();
       if (model === "qwen") {
         setQwenSectors(json.data || []);
-      } else {
+      } else if (model === "deepseek") {
         setDeepseekSectors(json.data || []);
+      } else {
+        setGeminiSectors(json.data || []);
       }
-      setSectors(model === "qwen" ? (json.data || []) : deepseekSectors);
+      setSectors(model === "qwen" ? (json.data || []) : model === "deepseek" ? deepseekSectors : geminiSectors);
     } catch (e: any) {
       setError(e.message);
     } finally {
       if (!isSwitch) {
         setLoading(false);
       } else {
-        setDeepseekLoading(false);
+        if (model === "deepseek") setDeepseekLoading(false);
+        if (model === "gemini") setGeminiLoading(false);
       }
       setPageLoaded(true);
     }
-  }, [deepseekSectors]);
+  }, [deepseekSectors, geminiSectors]);
 
   // 页面加载时自动获取千问推荐
   useEffect(() => {
@@ -84,12 +91,17 @@ export default function RecommendationsPage() {
 
     if (model === "qwen") {
       setSectors(qwenSectors);
-    } else {
-      // DeepSeek：按需加载
+    } else if (model === "deepseek") {
       if (deepseekSectors.length > 0) {
         setSectors(deepseekSectors);
       } else {
         fetchRecommendations("deepseek", true);
+      }
+    } else {
+      if (geminiSectors.length > 0) {
+        setSectors(geminiSectors);
+      } else {
+        fetchRecommendations("gemini", true);
       }
     }
   };
@@ -100,11 +112,13 @@ export default function RecommendationsPage() {
       setSectors(qwenSectors);
     } else if (activeModel === "deepseek" && deepseekSectors.length > 0) {
       setSectors(deepseekSectors);
+    } else if (activeModel === "gemini" && geminiSectors.length > 0) {
+      setSectors(geminiSectors);
     }
-  }, [activeModel, qwenSectors, deepseekSectors]);
+  }, [activeModel, qwenSectors, deepseekSectors, geminiSectors]);
 
-  const isLoading = activeModel === "deepseek" ? deepseekLoading : loading;
-  const currentSectors = activeModel === "qwen" ? qwenSectors : deepseekSectors;
+  const isLoading = activeModel === "deepseek" ? deepseekLoading : activeModel === "gemini" ? geminiLoading : loading;
+  const currentSectors = activeModel === "qwen" ? qwenSectors : activeModel === "deepseek" ? deepseekSectors : geminiSectors;
 
   return (
     <AuthGuard>
@@ -164,10 +178,10 @@ export default function RecommendationsPage() {
               display: "flex", gap: 4, background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: 3,
               border: "1px solid var(--border)",
             }}>
-              {(["qwen", "deepseek"] as ModelType[]).map((model) => {
+              {(["qwen", "deepseek", "gemini"] as ModelType[]).map((model) => {
                 const cfg = MODEL_CONFIG[model];
                 const isActive = activeModel === model;
-                const isLoading = model === "deepseek" && deepseekLoading;
+                const isLoading = (model === "deepseek" && deepseekLoading) || (model === "gemini" && geminiLoading);
                 return (
                   <button
                     key={model}
