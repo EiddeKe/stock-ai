@@ -111,3 +111,51 @@ export function getToken() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("token");
 }
+
+// --- 订阅相关 ---
+
+export interface Plan {
+  id: number;
+  name: string;
+  code: string;
+  price_monthly: number;
+  price_yearly: number;
+  description: string | null;
+  features: string[];
+  ai_calls_per_day: number;
+  max_models: number;
+  priority: number;
+}
+
+export interface SubscriptionInfo {
+  has_subscription: boolean;
+  subscription: {
+    id: number;
+    plan: { id: number; name: string; code: string; ai_calls_per_day: number; max_models: number } | null;
+    status: string;
+    start_at: string;
+    expire_at: string;
+    amount_paid: number;
+    auto_renew: boolean;
+  } | null;
+}
+
+export interface UsageStats {
+  today_calls: number;
+  daily_limit: number;
+  is_limited: boolean;
+  remaining: number;
+  plan_name: string;
+  plan_code: string;
+}
+
+export const subscriptionApi = {
+  getPlans: () => request("/api/subscription/plans") as Promise<Plan[]>,
+  getMySubscription: () => request("/api/subscription") as Promise<SubscriptionInfo>,
+  activateSubscription: (planCode: string, billingCycle: "monthly" | "yearly") =>
+    request("/api/subscription/activate", {
+      method: "POST",
+      body: JSON.stringify({ plan_code: planCode, billing_cycle: billingCycle }),
+    }),
+  getUsage: () => request("/api/subscription/usage") as Promise<UsageStats>,
+};

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, subscriptionApi, UsageStats } from "@/lib/api";
 import PositionCard from "@/components/PositionCard";
 import AddPositionModal from "@/components/AddPositionModal";
 import EditPositionModal from "@/components/EditPositionModal";
@@ -63,6 +63,7 @@ export default function StockAnalysisPage() {
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editPositionId, setEditPositionId] = useState<number | null>(null);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const hasLoadedOnce = useRef(false);
 
   const analyses = activeModel === "qwen" ? qwenAnalyses : activeModel === "deepseek" ? deepseekAnalyses : geminiAnalyses;
@@ -90,6 +91,7 @@ export default function StockAnalysisPage() {
   // 页面加载时自动获取持仓数据（首次加载显示骨架屏）
   useEffect(() => {
     fetchPositions(false);
+    subscriptionApi.getUsage().then(setUsageStats).catch(() => {});
     hasLoadedOnce.current = true;
   }, [fetchPositions]);
 
@@ -146,8 +148,15 @@ export default function StockAnalysisPage() {
       setActiveModel("qwen");
       setDeepseekAnalyses([]);
       setGeminiAnalyses([]);
+      subscriptionApi.getUsage().then(setUsageStats).catch(() => {});
     } catch (e: any) {
-      alert(e.message);
+      if (e.message.includes("已达上限")) {
+        if (confirm("每日分析次数已达上限，是否前往升级套餐？")) {
+          router.push("/pricing");
+        }
+      } else {
+        alert(e.message);
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -254,6 +263,24 @@ export default function StockAnalysisPage() {
             </a>
           </nav>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {usageStats && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
+                borderRadius: 8, fontSize: 12,
+                background: usageStats.remaining === 0 ? "var(--up-bg)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${usageStats.remaining === 0 ? "rgba(239, 68, 68, 0.3)" : "var(--border)"}`,
+                color: usageStats.remaining === 0 ? "var(--up)" : "var(--text-muted)",
+              }}>
+                {usageStats.daily_limit === -1 ? (
+                  <span>今日: 无限制 ({usageStats.plan_name})</span>
+                ) : (
+                  <span>今日: {usageStats.today_calls}/{usageStats.daily_limit}</span>
+                )}
+                {usageStats.remaining === 0 && usageStats.daily_limit !== -1 && (
+                  <a href="/pricing" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>升级</a>
+                )}
+              </div>
+            )}
             <UserMenu />
             <button className="btn btn-outline" onClick={() => fetchPositions(false)} disabled={loading}>
               {loading ? <span className="loading-spinner" /> : "⟳ 刷新"}

@@ -4,8 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, SessionLocal, Base
 from models import User
 from services.auth_service import hash_password
-from routers import positions, analysis, recommendation, chat, auth, admin
+from routers import positions, analysis, recommendation, chat, auth, admin, subscription, admin_plans
 from scheduler import start_scheduler
+from seed_plans import seed_plans
 
 
 def migrate_existing_data():
@@ -42,6 +43,9 @@ Base.metadata.create_all(bind=engine)
 # 数据迁移
 migrate_existing_data()
 
+# 初始化默认套餐
+seed_plans()
+
 app = FastAPI(title="A股交易指导助手", version="2.0.0")
 
 # CORS（允许前端跨域）
@@ -59,6 +63,8 @@ app.include_router(analysis.router)
 app.include_router(recommendation.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(subscription.router)
+app.include_router(admin_plans.router)
 
 
 @app.on_event("startup")

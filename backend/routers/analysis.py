@@ -6,6 +6,7 @@ from models import Position, User
 from services.quote_service import get_realtime_quote, get_daily_kline
 from services.indicator_service import calc_indicators
 from services.ai_service import analyze_stock
+from services.subscription_service import check_subscription_limit, log_usage
 from schemas import AnalysisResult
 from routers.auth import get_current_user, auth_header
 
@@ -20,6 +21,7 @@ def analyze_all_positions(
 ):
     """分析全部持仓"""
     current_user = get_current_user(token, db)
+    check_subscription_limit(current_user, db, action_type="analysis")
     positions = db.query(Position).filter(Position.user_id == current_user.id).all()
     if not positions:
         raise HTTPException(status_code=400, detail="请先添加持仓股票")
@@ -34,6 +36,10 @@ def analyze_all_positions(
                 suggestion="持有", confidence=50,
                 reason=f"分析失败: {e}", risk_tip="请重试",
             ))
+    try:
+        log_usage(current_user.id, "analysis", model, db)
+    except Exception:
+        pass
     return results
 
 
@@ -46,10 +52,16 @@ def analyze_position(
 ):
     """分析单只持仓股票"""
     current_user = get_current_user(token, db)
+    check_subscription_limit(current_user, db, action_type="analysis")
     position = db.query(Position).filter(Position.symbol == symbol, Position.user_id == current_user.id).first()
     if not position:
         raise HTTPException(status_code=404, detail="该股票不在持仓中")
-    return _analyze(position, db, model)
+    result = _analyze(position, db, model)
+    try:
+        log_usage(current_user.id, "analysis", model, db)
+    except Exception:
+        pass
+    return result
 
 
 def _analyze(position: Position, db: Session, model: str = "qwen") -> AnalysisResult:

@@ -6,6 +6,7 @@ from models import Position, ChatMessage, User
 from schemas import ChatMessageCreate, ChatMessageResponse, ChatReply
 from services.chat_service import chat
 from services.quote_service import get_realtime_quote
+from services.subscription_service import check_subscription_limit, log_usage
 from routers.auth import get_current_user, auth_header
 
 router = APIRouter(prefix="/api/chat", tags=["AI对话"])
@@ -39,6 +40,7 @@ def send_message(
         raise HTTPException(status_code=400, detail="不支持的模型")
 
     current_user = get_current_user(token, db)
+    check_subscription_limit(current_user, db, action_type="chat")
 
     # 构建持仓上下文
     positions = db.query(Position).filter(Position.user_id == current_user.id).all()
@@ -88,6 +90,10 @@ def send_message(
     # 保存 AI 回复
     ai_msg = ChatMessage(model=data.model, role="assistant", content=reply, user_id=current_user.id)
     db.add(ai_msg)
+    try:
+        log_usage(current_user.id, "chat", data.model, db)
+    except Exception:
+        pass
 
     db.commit()
     return ChatReply(reply=reply)
