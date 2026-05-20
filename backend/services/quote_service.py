@@ -1,41 +1,49 @@
-"""行情数据服务 - 直接调用新浪/腾讯行情接口"""
+"""行情数据服务 - 调用腾讯行情接口"""
 import requests
 import pandas as pd
 from typing import Optional
 
 
 def get_realtime_quote(symbol: str) -> Optional[dict]:
-    """获取实时行情（新浪接口）"""
+    """获取实时行情（腾讯qt接口）"""
     try:
         # 判断市场前缀
         prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
-        url = f"http://hq.sinajs.cn/list={prefix}{symbol}"
-        resp = requests.get(url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0",
-            "Referer": "https://finance.sina.com.cn",
-        })
+        url = f"https://qt.gtimg.cn/q={prefix}{symbol}"
+        resp = requests.get(url, timeout=10)
+        resp.encoding = "GBK"
         text = resp.text.strip()
-        if not text or "=" not in text:
+
+        # 格式: v_sh600519="1~贵州茅台~600519~1315.01~1324.30~..."
+        if not text or "~" not in text:
             return None
 
-        data_str = text.split("=")[1].strip('";')
-        if not data_str:
+        # 提取引号内的数据部分
+        start = text.find('"')
+        end = text.rfind('"')
+        if start == -1 or end == -1:
+            return None
+        data_str = text[start + 1:end]
+
+        parts = data_str.split("~")
+        if len(parts) < 35:
             return None
 
-        parts = data_str.split(",")
-        if len(parts) < 32:
-            return None
+        current_price = float(parts[3])
+        prev_close = float(parts[4])
+        high = float(parts[33])
+        low = float(parts[34])
 
         return {
             "symbol": symbol,
-            "name": parts[0],
-            "current_price": float(parts[3]),
-            "open_price": float(parts[1]),
-            "high_price": float(parts[4]),
-            "low_price": float(parts[5]),
-            "prev_close": float(parts[2]),
-            "volume": float(parts[8]),
-            "change_pct": round((float(parts[3]) - float(parts[2])) / float(parts[2]) * 100, 2) if float(parts[2]) > 0 else 0,
+            "name": parts[1],
+            "current_price": current_price,
+            "open_price": float(parts[5]),
+            "high_price": high,
+            "low_price": low,
+            "prev_close": prev_close,
+            "volume": float(parts[6]) * 100,  # 腾讯返回的是手(1手=100股)
+            "change_pct": float(parts[32]),
         }
     except Exception as e:
         print(f"获取行情失败 {symbol}: {e}")
