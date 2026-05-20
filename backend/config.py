@@ -10,8 +10,10 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-a4f52905826d4302bb299361062
 # Google Gemini API Key
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
-# 数据库路径
-DATABASE_URL = "sqlite:///./stock_advisor.db"
+# 数据库路径 (SQLite)
+# DATABASE_URL = "sqlite:///./stock_advisor.db"
+# MySQL
+DATABASE_URL = "mysql+pymysql://stock_ai:SkAi_LJH0GuG09cKJoIrE@localhost:3306/stock_ai"
 
 # 定时分析间隔（秒），默认 30 分钟
 SCHEDULE_INTERVAL = 1800
