@@ -2,12 +2,13 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
-import { subscriptionApi } from "@/lib/api";
+import { subscriptionApi, getInvestmentStyle, setInvestmentStyle } from "@/lib/api";
 
 export default function UserMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [subInfo, setSubInfo] = useState<string>("免费版");
+  const [currentStyle, setCurrentStyle] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,6 +27,19 @@ export default function UserMenu() {
       }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    getInvestmentStyle().then(setCurrentStyle).catch(() => {});
+  }, []);
+
+  const handleStyleChange = async (style: "short_term" | "long_term") => {
+    try {
+      await setInvestmentStyle(style);
+      setCurrentStyle(style);
+    } catch {
+      alert("更新失败，请重试");
+    }
+  };
 
   if (!user) return null;
 
@@ -71,6 +85,26 @@ export default function UserMenu() {
             我的订阅
           </Link>
           <div style={{ padding: "0 16px 4px", fontSize: 11, color: "var(--text-muted)" }}>{subInfo}</div>
+          <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>投资风格</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["short_term", "long_term"] as const).map((style) => (
+                <button
+                  key={style}
+                  onClick={() => handleStyleChange(style)}
+                  style={{
+                    flex: 1, padding: "5px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                    background: currentStyle === style ? "var(--accent)" : "transparent",
+                    color: currentStyle === style ? "#fff" : "var(--text-secondary)",
+                    border: `1px solid ${currentStyle === style ? "var(--accent)" : "var(--border)"}`,
+                    cursor: "pointer", transition: "all 0.2s",
+                  }}
+                >
+                  {style === "short_term" ? "⚡ 短线" : "🏔️ 长线"}
+                </button>
+              ))}
+            </div>
+          </div>
           <button
             onClick={() => { logout(); setOpen(false); window.location.href = "/"; }}
             style={{

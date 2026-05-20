@@ -230,3 +230,87 @@ body {
   z-index: 100;
   animation: fadeIn 0.2s ease-out;
 }
+
+/* ========== 响应式工具类 ========== */
+
+/* 响应式网格 — 4列 */
+.grid-responsive-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .grid-responsive-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .grid-responsive-4 { grid-template-columns: 1fr; }
+}
+
+/* 响应式网格 — 3列 */
+.grid-responsive-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+@media (max-width: 1024px) {
+  .grid-responsive-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .grid-responsive-3 { grid-template-columns: 1fr; }
+}
+
+/* 响应式弹窗 */
+.modal-responsive {
+  width: calc(100% - 32px);
+  max-width: 480px;
+  border-radius: 16px;
+  padding: 32px 28px;
+}
+@media (max-width: 768px) {
+  .modal-responsive {
+    max-width: 100%;
+    padding: 24px 20px;
+    border-radius: 12px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+/* 表格横向滚动容器 */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+/* Flex wrap */
+.flex-wrap { flex-wrap: wrap; }
+
+/* Mobile 隐藏/显示 */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+}
+.show-mobile { display: none !important; }
+@media (max-width: 768px) {
+  .show-mobile { display: block !important; }
+}
+.show-mobile-flex { display: none !important; }
+@media (max-width: 768px) {
+  .show-mobile-flex { display: flex !important; }
+}
+
+/* Tablet 隐藏 */
+@media (max-width: 1024px) {
+  .hide-tablet { display: none !important; }
+}
+
+/* Mobile padding 缩减 */
+@media (max-width: 768px) {
+  .page-content { padding: 16px 12px !important; }
+}
+
+/* 响应式 header 间距 */
+.header-nav { gap: 24px; }
+@media (max-width: 768px) {
+  .header-nav { gap: 8px; }
+}

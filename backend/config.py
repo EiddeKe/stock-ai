@@ -28,3 +28,24 @@ SCHEDULED_SYMBOLS: list[str] = os.getenv("SCHEDULED_SYMBOLS", "[]").strip("[]").
 # JWT
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")
 JWT_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "7"))
+
+# AI Model Pricing (per 1K tokens, in RMB)
+MODEL_PRICING = {
+    "qwen": {"input_per_1k": 0.004, "output_per_1k": 0.016},
+    "deepseek": {"input_per_1k": 0.002, "output_per_1k": 0.008},
+    "gemini": {"input_per_1k": 0.0025, "output_per_1k": 0.010},
+}
+
+# Monthly budget cap per subscription tier (RMB), -1 = unlimited
+MONTHLY_BUDGET = {
+    "free": 10.0,
+    "pro": 100.0,
+    "premium": -1,
+}
+
+# Model access tier (min max_models required)
+MODEL_TO_TIER = {
+    "qwen": 1,
+    "deepseek": 2,
+    "gemini": 2,
+}

@@ -24,3 +24,25 @@ def decode_token(token: str) -> int | None:
         return int(payload["sub"])
     except (JWTError, ValueError):
         return None
+
+
+def create_admin_token(admin_id: int, role: str) -> str:
+    expire = datetime.utcnow() + timedelta(days=JWT_EXPIRE_DAYS)
+    return jwt.encode(
+        {"sub": str(admin_id), "role": role, "type": "admin", "exp": expire},
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+
+
+def decode_admin_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        if payload.get("type") != "admin":
+            return None
+        return {
+            "admin_id": int(payload["sub"]),
+            "role": payload.get("role", "admin"),
+        }
+    except (JWTError, ValueError):
+        return None

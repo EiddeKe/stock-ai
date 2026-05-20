@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function DashboardPage() {
+  const { isMobile } = useMediaQuery();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -13,11 +15,11 @@ export default function DashboardPage() {
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>加载中...</div>;
 
   return (
-    <div style={{ padding: 32 }}>
+    <div style={{ padding: isMobile ? 16 : 32 }}>
       <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>仪表盘</h2>
       <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 32 }}>系统运行概览</p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+      <div className="grid-responsive-4" style={{ gap: 20 }}>
         <StatCard label="总用户数" value={stats?.total_users ?? 0} icon="👥" />
         <StatCard label="活跃订阅" value={stats?.active_subscriptions ?? 0} icon="🎫" />
         <StatCard label="今日调用量" value={stats?.today_total_calls ?? 0} icon="⚡" />
@@ -26,9 +28,9 @@ export default function DashboardPage() {
 
       {/* 今日调用量分布 */}
       {stats?.by_action_type && Object.keys(stats.by_action_type).length > 0 && (
-        <div className="card animate-fade-in" style={{ marginTop: 32, padding: 24 }}>
+        <div className="card animate-fade-in table-wrapper" style={{ marginTop: 32, padding: 24 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>今日调用量分布</h3>
-          <div style={{ display: "flex", gap: 32 }}>
+          <div className="table-wrapper" style={{ display: "flex", gap: 32 }}>
             {Object.entries(stats.by_action_type as Record<string, number>).map(([type, count]) => (
               <div key={type} style={{ flex: 1, textAlign: "center" }}>
                 <div style={{ height: 120, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>

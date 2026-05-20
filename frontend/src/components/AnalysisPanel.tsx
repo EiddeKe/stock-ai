@@ -32,6 +32,16 @@ export default function AnalysisPanel({ results, model = "qwen" }: { results: An
 
   return (
     <div className="animate-fade-in">
+      {/* AI 分析免责声明 */}
+      <div style={{
+        padding: "8px 14px", borderRadius: 8, marginBottom: 16,
+        background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.2)",
+        fontSize: 12, color: "#f59e0b", display: "flex", alignItems: "center", gap: 6,
+      }}>
+        <span>⚠</span>
+        <span>AI 生成内容仅供参考，不构成投资建议。请结合多方信息独立判断。</span>
+      </div>
+
       {/* 分析结果头部 */}
       <div className="card" style={{
         marginBottom: 20, padding: "20px 24px",

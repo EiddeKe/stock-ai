@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { api } from "@/lib/api";
+import { api, sendChatMessageStream } from "@/lib/api";
 
 interface ChatMsg {
   id: number;
@@ -19,9 +19,11 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef(model);
+  const streamController = useRef<AbortController | null>(null);
 
   const fetchHistory = useCallback(async (m: "qwen" | "deepseek" | "gemini") => {
     try {
@@ -45,31 +47,39 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingContent]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     const msg = input.trim();
     setInput("");
     setLoading(true);
+    setStreamingContent("");
     const tempUser: ChatMsg = { id: Date.now(), role: "user", content: msg, created_at: "" };
     setMessages((prev) => [...prev, tempUser]);
-    try {
-      const res = await api.sendChatMessage(model, msg, enableSearch);
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { id: Date.now(), role: "user", content: msg, created_at: "" },
-        { id: Date.now() + 1, role: "assistant", content: res.reply, created_at: "" },
-      ]);
-    } catch (e: any) {
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { id: Date.now(), role: "user", content: msg, created_at: "" },
-        { id: Date.now() + 1, role: "assistant", content: `发送失败: ${e.message}`, created_at: "" },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+
+    streamController.current = sendChatMessageStream(
+      model, msg, enableSearch,
+      (chunk) => {
+        setStreamingContent((prev) => prev + chunk);
+      },
+      () => {
+        // 流式完成，将完整内容加入消息列表
+        setStreamingContent("");
+        setLoading(false);
+        // 刷新历史以获取保存的消息
+        fetchHistory(model);
+      },
+      (error) => {
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { id: Date.now(), role: "user", content: msg, created_at: "" },
+          { id: Date.now() + 1, role: "assistant", content: `发送失败: ${error}`, created_at: "" },
+        ]);
+        setStreamingContent("");
+        setLoading(false);
+      },
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -85,7 +95,7 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
     }}>
       {/* 对话区域 */}
       <div ref={containerRef} style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-        {messages.length === 0 && (
+        {messages.length === 0 && !streamingContent && (
           <div style={{ textAlign: "center", paddingTop: 40, color: "var(--text-muted)", fontSize: 13 }}>
             <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.3 }}>💬</div>
             <p>开始与 AI 交流</p>
@@ -112,7 +122,22 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
             </div>
           );
         })}
-        {loading && (
+        {streamingContent && (
+          <div style={{
+            display: "flex", justifyContent: "flex-start", marginBottom: 12,
+          }}>
+            <div style={{
+              maxWidth: "85%", padding: "10px 14px", borderRadius: 12,
+              fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              background: "rgba(255,255,255,0.06)", color: "var(--text-primary)",
+              borderBottomLeftRadius: 4, borderBottomRightRadius: 12,
+            }}>
+              {streamingContent}
+              <span className="loading-spinner" style={{ marginLeft: 4, display: "inline-block" }} />
+            </div>
+          </div>
+        )}
+        {loading && !streamingContent && (
           <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 12 }}>
             <div style={{
               padding: "10px 14px", borderRadius: 12, fontSize: 13,
@@ -180,7 +205,7 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
             disabled={loading || !input.trim()}
             style={{ alignSelf: "flex-end", padding: "8px 16px", fontSize: 13 }}
           >
-            {enableSearch ? "🔍 发送" : "发送"}
+            {loading ? "生成中..." : (enableSearch ? "🔍 发送" : "发送")}
           </button>
         </div>
       </div>

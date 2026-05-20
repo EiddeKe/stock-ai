@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function UsagePage() {
+  const { isMobile } = useMediaQuery();
   const [stats, setStats] = useState<any>(null);
   const [userStats, setUserStats] = useState<any>(null);
   const [userPage, setUserPage] = useState(1);
@@ -33,12 +35,12 @@ export default function UsagePage() {
   const maxModelVal = Math.max(...Object.values(byModel).map(Number), 1);
 
   return (
-    <div style={{ padding: 32 }}>
+    <div style={{ padding: isMobile ? 16 : 32 }}>
       <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>用量统计</h2>
       <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 32 }}>平台 AI 调用量与用户用量明细</p>
 
       {/* 总览卡片 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 32 }}>
+      <div className="grid-responsive-4" style={{ gap: 20, marginBottom: 32 }}>
         <StatCard label="今日调用量" value={stats.today_total_calls} icon="⚡" />
         <StatCard label="本月调用量" value={stats.month_total_calls} icon="📅" />
         <StatCard label="本月总成本" value={`¥${stats.month_total_cost}`} icon="💰" />
@@ -92,11 +94,12 @@ export default function UsagePage() {
       )}
 
       {/* 用户用量明细表 */}
-      <div className="card animate-fade-in" style={{ marginTop: 24, padding: 24 }}>
+      <div className="card animate-fade-in table-wrapper" style={{ marginTop: 24, padding: 24 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>用户用量明细</h3>
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 20 }}>
           共 {userStats?.total ?? 0} 个用户 · 第 {userPage} / {Math.ceil((userStats?.total ?? 0) / 20)} 页
         </p>
+        <div className="table-wrapper">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -140,6 +143,7 @@ export default function UsagePage() {
             ))}
           </tbody>
         </table>
+        </div>
         {/* 分页 */}
         {userStats && (userStats.total ?? 0) > 20 && (
           <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 16 }}>

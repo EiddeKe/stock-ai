@@ -64,6 +64,61 @@ export const api = {
     request(`/api/chat?model=${model}`, { method: "DELETE" }),
 };
 
+// 流式发送消息
+export function sendChatMessageStream(
+  model: "qwen" | "deepseek" | "gemini",
+  message: string,
+  enableSearch: boolean,
+  onChunk: (chunk: string) => void,
+  onDone: () => void,
+  onError: (error: string) => void,
+): AbortController {
+  const controller = new AbortController();
+  const token = getToken();
+
+  fetch(`/api/chat/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ model, message, enable_search: enableSearch }),
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "请求失败" }));
+        onError(err.detail || "请求失败");
+        return;
+      }
+      const reader = res.body?.getReader();
+      if (!reader) { onError("浏览器不支持流式响应"); return; }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) { onError(data.content); return; }
+            if (data.done) { onDone(); return; }
+            if (data.content) onChunk(data.content);
+          } catch {}
+        }
+      }
+    })
+    .catch((e) => {
+      if (e.name !== "AbortError") onError(e.message);
+    });
+
+  return controller;
+}
+
 export async function login(account: string, password: string) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
@@ -104,7 +159,7 @@ export function logout() {
 export function getUser() {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem("user");
-  return raw ? JSON.parse(raw) as { id: number; account: string; nickname: string } : null;
+  return raw ? JSON.parse(raw) as { id: number; account: string; nickname: string; investment_style?: string | null } : null;
 }
 
 export function getToken() {
@@ -128,7 +183,30 @@ export async function fetchMe() {
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
   if (!res.ok) throw new Error("获取用户信息失败");
-  return res.json() as Promise<{ id: number; account: string; nickname: string; agreed_terms_at: string | null }>;
+  return res.json() as Promise<{ id: number; account: string; nickname: string; agreed_terms_at: string | null; investment_style: string | null }>;
+}
+
+// 获取投资风格
+export async function getInvestmentStyle(): Promise<string | null> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/auth/me/investment-style`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.investment_style as string | null;
+}
+
+// 设置投资风格
+export async function setInvestmentStyle(style: "short_term" | "long_term") {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/auth/me/investment-style`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ investment_style: style }),
+  });
+  if (!res.ok) throw new Error("保存投资风格失败");
+  return res.json();
 }
 
 // --- 订阅相关 ---

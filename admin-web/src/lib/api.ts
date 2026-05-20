@@ -7,11 +7,22 @@ async function request(url: string, options?: RequestInit) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers: { ...headers, ...options?.headers },
-  });
+  const fetchUrl = `${API_BASE}${url}`;
+  console.log('[api] request:', fetchUrl);
+
+  let res;
+  try {
+    res = await fetch(fetchUrl, {
+      ...options,
+      headers: { ...headers, ...options?.headers },
+    });
+  } catch (e: any) {
+    console.error('[api] fetch failed:', e.message);
+    throw new Error(`网络请求失败: ${e.message}`);
+  }
+
   if (!res.ok) {
+    console.error('[api] error response:', res.status, res.statusText);
     if (res.status === 401) {
       localStorage.removeItem("admin_token");
       window.location.href = "/admin/login";

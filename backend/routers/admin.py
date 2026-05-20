@@ -1,25 +1,71 @@
-"""用户管理 API（管理员专用）"""
+"""管理员认证 + 用户管理 API"""
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User
-from services.auth_service import hash_password
+from models import User, AdminUser
+from services.auth_service import hash_password, verify_password, create_admin_token, decode_admin_token
 
-router = APIRouter(prefix="/api/admin/users", tags=["用户管理"])
+router = APIRouter(prefix="/api/admin", tags=["管理员"])
+
+router_users = APIRouter(prefix="/api/admin/users", tags=["用户管理"])
 
 
-ADMIN_PASSWORD = "admin123"
-
-
-def verify_admin(authorization: str | None = Header(default=None)) -> None:
-    """验证管理员密码"""
+def verify_admin(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> dict:
+    """验证管理员 JWT"""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="缺少认证信息")
     token = authorization.split(" ", 1)[1]
-    if token != ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="管理员密码错误")
+    info = decode_admin_token(token)
+    if not info:
+        raise HTTPException(status_code=401, detail="认证已过期")
+    admin = db.query(AdminUser).filter(AdminUser.id == info["admin_id"]).first()
+    if not admin or not admin.is_active:
+        raise HTTPException(status_code=403, detail="账号不可用")
+    return info
+
+
+class LoginReq(BaseModel):
+    account: str
+    password: str
+
+
+class LoginResp(BaseModel):
+    token: str
+    account: str
+    role: str
+
+
+@router.post("/login", response_model=LoginResp)
+def admin_login(data: LoginReq, db: Session = Depends(get_db)):
+    """管理员登录"""
+    admin = db.query(AdminUser).filter(AdminUser.account == data.account).first()
+    if not admin or not admin.is_active:
+        raise HTTPException(status_code=401, detail="账号或密码错误")
+    if not verify_password(data.password, admin.hashed_pwd):
+        raise HTTPException(status_code=401, detail="账号或密码错误")
+    token = create_admin_token(admin.id, admin.role)
+    return LoginResp(token=token, account=admin.account, role=admin.role)
+
+
+class AdminItem(BaseModel):
+    id: int
+    account: str
+    role: str
+    is_active: bool
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/me", response_model=AdminItem)
+def get_my_info(info: dict = Depends(verify_admin), db: Session = Depends(get_db)):
+    admin = db.query(AdminUser).filter(AdminUser.id == info["admin_id"]).first()
+    return AdminItem(
+        id=admin.id, account=admin.account, role=admin.role,
+        is_active=admin.is_active, created_at=str(admin.created_at),
+    )
 
 
 class UserItem(BaseModel):
@@ -49,7 +95,7 @@ class UserUpdate(BaseModel):
     nickname: Optional[str] = None
 
 
-@router.get("", response_model=UserListResponse)
+@router_users.get("", response_model=UserListResponse)
 def list_users(
     page: int = 1,
     page_size: int = 20,
@@ -57,7 +103,6 @@ def list_users(
     _=Depends(verify_admin),
     db: Session = Depends(get_db),
 ):
-    """获取用户列表（分页 + 搜索）"""
     query = db.query(User)
     if keyword:
         query = query.filter(
@@ -69,24 +114,20 @@ def list_users(
         "total": total,
         "users": [
             UserItem(
-                id=u.id,
-                account=u.account,
-                nickname=u.nickname,
-                created_at=str(u.created_at),
-                updated_at=str(u.updated_at) if u.updated_at else None,
+                id=u.id, account=u.account, nickname=u.nickname,
+                created_at=str(u.created_at), updated_at=str(u.updated_at) if u.updated_at else None,
             )
             for u in users
         ],
     }
 
 
-@router.post("", response_model=UserItem)
+@router_users.post("", response_model=UserItem)
 def create_user(
     data: UserCreate,
     _=Depends(verify_admin),
     db: Session = Depends(get_db),
 ):
-    """创建新用户"""
     if db.query(User).filter(User.account == data.account).first():
         raise HTTPException(status_code=400, detail="该账号已存在")
     if len(data.password) < 6:
@@ -96,26 +137,21 @@ def create_user(
     db.commit()
     db.refresh(user)
     return UserItem(
-        id=user.id,
-        account=user.account,
-        nickname=user.nickname,
-        created_at=str(user.created_at),
-        updated_at=str(user.updated_at) if user.updated_at else None,
+        id=user.id, account=user.account, nickname=user.nickname,
+        created_at=str(user.created_at), updated_at=str(user.updated_at) if user.updated_at else None,
     )
 
 
-@router.put("/{user_id}", response_model=UserItem)
+@router_users.put("/{user_id}", response_model=UserItem)
 def update_user(
     user_id: int,
     data: UserUpdate,
     _=Depends(verify_admin),
     db: Session = Depends(get_db),
 ):
-    """更新用户信息"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-
     if data.account is not None:
         existing = db.query(User).filter(User.account == data.account, User.id != user_id).first()
         if existing:
@@ -129,32 +165,28 @@ def update_user(
         if len(data.nickname) > 20:
             raise HTTPException(status_code=400, detail="昵称最多 20 个字符")
         user.nickname = data.nickname
-
     db.commit()
     db.refresh(user)
     return UserItem(
-        id=user.id,
-        account=user.account,
-        nickname=user.nickname,
-        created_at=str(user.created_at),
-        updated_at=str(user.updated_at) if user.updated_at else None,
+        id=user.id, account=user.account, nickname=user.nickname,
+        created_at=str(user.created_at), updated_at=str(user.updated_at) if user.updated_at else None,
     )
 
 
-@router.delete("/{user_id}")
+@router_users.delete("/{user_id}")
 def delete_user(
     user_id: int,
     _=Depends(verify_admin),
     db: Session = Depends(get_db),
 ):
-    """删除用户（同时删除关联的持仓和对话记录）"""
-    from models import Position, ChatMessage
+    from models import Position, ChatMessage, Subscription, UsageLog
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-
     db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete()
     db.query(Position).filter(Position.user_id == user_id).delete()
+    db.query(Subscription).filter(Subscription.user_id == user_id).delete()
+    db.query(UsageLog).filter(UsageLog.user_id == user_id).delete()
     db.delete(user)
     db.commit()
     return {"message": "已删除"}

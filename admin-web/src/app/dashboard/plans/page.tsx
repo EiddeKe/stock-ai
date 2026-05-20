@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { adminApi, AdminPlan, PlanInput } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function PlansPage() {
+  const { isMobile } = useMediaQuery();
   const [plans, setPlans] = useState<AdminPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -65,8 +67,8 @@ export default function PlansPage() {
   };
 
   return (
-    <div style={{ padding: 32 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+    <div style={{ padding: isMobile ? 16 : 32 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12, flexDirection: isMobile ? "column" : "row" }}>
         <div>
           <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>套餐管理</h2>
           <p style={{ fontSize: 14, color: "var(--text-muted)" }}>管理用户订阅套餐和定价</p>
@@ -83,7 +85,7 @@ export default function PlansPage() {
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
           {plans.map((p, i) => (
-            <div key={p.id} className="card animate-fade-in" style={{ display: "flex", alignItems: "stretch", gap: 20, padding: 24 }}>
+            <div key={p.id} className="card animate-fade-in" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "stretch", gap: 20, padding: 24 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                   <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{p.name}</h3>
@@ -113,17 +115,17 @@ export default function PlansPage() {
 
       {showModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowModal(false)}>
-          <div className="card animate-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: 480, padding: 32, background: "var(--bg-secondary)", maxHeight: "90vh", overflowY: "auto" }}>
+          <div className="card animate-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 480, padding: 32, background: "var(--bg-secondary)", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>{editPlan ? "编辑套餐" : "新增套餐"}</h3>
             <div style={{ display: "grid", gap: 14 }}>
               <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>名称</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="如：专业版" /></div>
               {!editPlan && <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>Code</label><input className="input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="如：pro" /></div>}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>月付价格（元）</label><input className="input" type="number" value={form.price_monthly} onChange={(e) => setForm({ ...form, price_monthly: Number(e.target.value) })} /></div>
                 <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>年付价格（元）</label><input className="input" type="number" value={form.price_yearly} onChange={(e) => setForm({ ...form, price_yearly: Number(e.target.value) })} /></div>
               </div>
               <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>每日调用次数（-1=无限）</label><input className="input" type="number" value={form.ai_calls_per_day} onChange={(e) => setForm({ ...form, ai_calls_per_day: Number(e.target.value) })} /></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                 <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>最大模型数</label><input className="input" type="number" value={form.max_models} onChange={(e) => setForm({ ...form, max_models: Number(e.target.value) })} /></div>
                 <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>排序权重</label><input className="input" type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })} /></div>
               </div>

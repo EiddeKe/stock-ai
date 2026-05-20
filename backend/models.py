@@ -14,6 +14,7 @@ class User(Base):
     hashed_pwd = Column(String(200), nullable=False, comment="bcrypt 密码哈希")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    investment_style = Column(String(20), nullable=True, comment="投资风格: short_term/long_term")
 
     positions = relationship("Position", back_populates="owner")
     chat_messages = relationship("ChatMessage", back_populates="owner")
@@ -105,3 +106,14 @@ class UsageLog(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     user = relationship("User", back_populates="usage_logs")
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account = Column(String(100), unique=True, nullable=False, comment="管理员账号")
+    hashed_pwd = Column(String(200), nullable=False, comment="bcrypt 密码哈希")
+    role = Column(String(20), nullable=False, default="admin", comment="角色: admin/readonly")
+    is_active = Column(Boolean, nullable=False, default=True, comment="是否启用")
+    created_at = Column(DateTime, default=datetime.now)

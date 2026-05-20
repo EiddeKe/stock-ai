@@ -81,12 +81,33 @@ def delete_plan(plan_id: int, _=Depends(verify_admin), db: Session = Depends(get
 def usage_analytics(_=Depends(verify_admin), db: Session = Depends(get_db)):
     """全平台用量统计"""
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # 今日统计
     today_total = db.query(UsageLog).filter(UsageLog.created_at >= today_start).count()
-    by_type = (
+    by_type = dict(
         db.query(UsageLog.action_type, func.count(UsageLog.id))
         .filter(UsageLog.created_at >= today_start)
         .group_by(UsageLog.action_type).all()
     )
+    # 模型分布（全部时间）
+    by_model = dict(
+        db.query(UsageLog.model_used, func.count(UsageLog.id))
+        .filter(UsageLog.model_used.isnot(None))
+        .group_by(UsageLog.model_used).all()
+    )
+    # 本月总调用量
+    month_total = db.query(UsageLog).filter(UsageLog.created_at >= month_start).count()
+    # 本月总成本
+    month_cost = float(
+        db.query(func.coalesce(func.sum(UsageLog.cost), 0))
+        .filter(UsageLog.created_at >= month_start).scalar()
+    )
+    # 历史总调用量
+    total_calls = db.query(UsageLog).count()
+    # 历史总成本
+    total_cost = float(db.query(func.coalesce(func.sum(UsageLog.cost), 0)).scalar())
+
     total_users = db.query(User).count()
     active_subs = db.query(Subscription).filter(
         Subscription.status == "active",
@@ -94,7 +115,64 @@ def usage_analytics(_=Depends(verify_admin), db: Session = Depends(get_db)):
     ).count()
     return {
         "today_total_calls": today_total,
-        "by_action_type": dict(by_type),
+        "by_action_type": by_type,
+        "by_model": by_model,
+        "month_total_calls": month_total,
+        "month_total_cost": round(month_cost, 4),
+        "total_calls": total_calls,
+        "total_cost": round(total_cost, 4),
         "total_users": total_users,
         "active_subscriptions": active_subs,
+    }
+
+
+@router.get("/stats/users")
+def usage_by_user(
+    page: int = 1,
+    page_size: int = 20,
+    _=Depends(verify_admin),
+    db: Session = Depends(get_db),
+):
+    """每个用户的模型调用量统计"""
+    from models import User
+    total = db.query(User).count()
+    users = db.query(User).order_by(User.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+    result = []
+    for u in users:
+        user_stats = (
+            db.query(
+                func.count(UsageLog.id),
+                func.coalesce(func.sum(UsageLog.cost), 0),
+            )
+            .filter(UsageLog.user_id == u.id)
+            .first()
+        )
+        # 按模型分拆
+        user_by_model = dict(
+            db.query(UsageLog.model_used, func.count(UsageLog.id))
+            .filter(UsageLog.user_id == u.id, UsageLog.model_used.isnot(None))
+            .group_by(UsageLog.model_used).all()
+        )
+        # 本月统计
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_count = db.query(UsageLog).filter(
+            UsageLog.user_id == u.id, UsageLog.created_at >= today_start
+        ).count()
+
+        result.append({
+            "user_id": u.id,
+            "account": u.account,
+            "nickname": u.nickname,
+            "total_calls": user_stats[0],
+            "total_cost": round(float(user_stats[1]), 4),
+            "today_calls": today_count,
+            "by_model": user_by_model,
+        })
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "users": result,
     }

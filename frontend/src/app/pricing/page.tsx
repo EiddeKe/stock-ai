@@ -43,7 +43,7 @@ export default function PricingPage() {
         position: "sticky", top: 0, zIndex: 50,
         borderBottom: "1px solid var(--border)",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 60, justifyContent: "space-between" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 12px", display: "flex", alignItems: "center", height: 60, justifyContent: "space-between", flexWrap: "wrap" }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
@@ -63,7 +63,7 @@ export default function PricingPage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 20px" }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 20px 48px 20px" }}>
         {/* 标题 */}
         <div className="animate-fade-in" style={{ textAlign: "center", marginBottom: 40 }}>
           <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}>
@@ -104,13 +104,13 @@ export default function PricingPage() {
 
         {/* 套餐卡片 */}
         {loading ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ display: "grid", gap: 24, maxWidth: 900, margin: "0 auto" }} className="grid-responsive-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="card skeleton" style={{ height: 380 }} />
             ))}
           </div>
         ) : (
-          <div className="animate-fade-in-up" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, maxWidth: 900, margin: "0 auto" }}>
+          <div className="animate-fade-in-up grid-responsive-3" style={{ display: "grid", gap: 24, maxWidth: 900, margin: "0 auto" }}>
             {plans.map((plan) => {
               const isCurrent = currentPlanCode === plan.code;
               const isPopular = plan.code === "pro";
@@ -189,7 +189,8 @@ export default function PricingPage() {
           <h3 style={{ fontSize: 20, fontWeight: 700, textAlign: "center", marginBottom: 24 }}>
             <span className="gradient-text">功能对比</span>
           </h3>
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="card table-wrapper" style={{ overflow: "hidden" }}>
+            <div className="table-wrapper">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -221,6 +222,7 @@ export default function PricingPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </main>

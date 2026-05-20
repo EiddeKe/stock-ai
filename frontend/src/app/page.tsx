@@ -1,13 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { getToken } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { getToken, getEnvInfo } from "@/lib/api";
 import LoginModal from "@/components/LoginModal";
 
 export default function Home() {
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
+  const [envInfo, setEnvInfo] = useState<{ env: string; database_type: string; is_prod: boolean } | null>(null);
+
+  useEffect(() => {
+    getEnvInfo().then(setEnvInfo);
+  }, []);
 
   const handleCardClick = (path: string) => {
     if (getToken()) {
@@ -31,7 +36,7 @@ export default function Home() {
         zIndex: 50,
         borderBottom: "1px solid var(--border)",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 60 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
@@ -46,6 +51,26 @@ export default function Home() {
               <span style={{ fontSize: 13, fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>交易指导助手</span>
             </h1>
           </div>
+
+          {/* 环境标识 — 仅非生产时显示 */}
+          {envInfo && !envInfo.is_prod && (
+            <span style={{
+              fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20,
+              background: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)",
+              color: "#f59e0b",
+            }}>
+              ⚠ {envInfo.env.toUpperCase()} / {envInfo.database_type}
+            </span>
+          )}
+          {envInfo && envInfo.is_prod && (
+            <span style={{
+              fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20,
+              background: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)",
+              color: "#22c55e",
+            }}>
+              ● 生产环境 / {envInfo.database_type}
+            </span>
+          )}
         </div>
       </header>
 
@@ -61,7 +86,7 @@ export default function Home() {
         </div>
 
         {/* 功能入口 */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
           {/* 持仓分析 */}
           <div
             className="card animate-fade-in-up"
@@ -84,7 +109,7 @@ export default function Home() {
           <div
             className="card animate-fade-in-up"
             style={{ cursor: "pointer", padding: 32, transition: "transform 0.2s, box-shadow 0.2s", animationDelay: "0.1s" }}
-            onClick={() => handleCardClick("/recommendations")}
+            onClick={() => handleCardClick("/stock-analysis?tab=recommendations")}
             onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 32px rgba(16, 185, 129, 0.2)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}
           >
@@ -101,6 +126,19 @@ export default function Home() {
       </main>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLogin={handleLogin} />}
+
+      {/* 底部免责声明 */}
+      <footer style={{
+        padding: "16px 20px", borderTop: "1px solid var(--border)",
+        background: "rgba(0,0,0,0.2)", textAlign: "center",
+      }}>
+        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.6 }}>
+          ⚠ 免责声明：本平台仅提供信息分析服务，AI 生成内容仅供参考，不构成任何投资建议。
+          平台不提供任何股票交易操作功能。用户应独立判断，平台不对投资盈亏承担责任。
+          <a href="/terms" target="_blank" style={{ color: "var(--accent)", textDecoration: "none" }}> 用户协议</a>
+          <a href="/privacy" target="_blank" style={{ color: "var(--accent)", textDecoration: "none", marginLeft: 8 }}> 隐私政策</a>
+        </p>
+      </footer>
     </div>
   );
 }

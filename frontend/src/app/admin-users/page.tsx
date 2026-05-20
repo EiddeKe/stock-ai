@@ -148,7 +148,7 @@ export default function AdminUsersPage() {
         position: "sticky", top: 0, zIndex: 50,
         borderBottom: "1px solid var(--border)",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
@@ -166,14 +166,14 @@ export default function AdminUsersPage() {
               onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>首页</a>
             <a href="/stock-analysis" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: "transparent", color: "var(--text-secondary)", textDecoration: "none" }}>持仓分析</a>
-            <a href="/recommendations" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: "transparent", color: "var(--text-secondary)", textDecoration: "none" }}>热门推荐</a>
+            <a href="/stock-analysis?tab=recommendations" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: "transparent", color: "var(--text-secondary)", textDecoration: "none" }}>热门推荐</a>
           </nav>
         </div>
       </header>
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
         {/* 操作栏 */}
-        <div className="animate-fade-in" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <div className="animate-fade-in" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <input
               className="input"
@@ -211,7 +211,8 @@ export default function AdminUsersPage() {
             暂无用户数据
           </div>
         ) : (
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="card table-wrapper" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="table-wrapper">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -239,6 +240,7 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
+            </div>
 
             {/* 分页 */}
             {totalPages > 1 && (
@@ -259,7 +261,8 @@ export default function AdminUsersPage() {
           display: "flex", alignItems: "center", justifyContent: "center",
         }} onClick={() => setShowModal(false)}>
           <div className="card animate-fade-in" onClick={(e) => e.stopPropagation()} style={{
-            width: 400, padding: 32, background: "var(--bg-secondary)",
+            width: "calc(100% - 32px)", maxWidth: 400, padding: 32, background: "var(--bg-secondary)",
+            maxHeight: "90vh", overflowY: "auto",
           }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>
               {editUser ? "编辑用户" : "新增用户"}

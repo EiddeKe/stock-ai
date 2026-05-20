@@ -14,10 +14,12 @@ def build_analysis_prompt(
     indicators: dict,
 ) -> str:
     """构建统一的分析 prompt"""
-    profit_pct = round((current_price - cost_price) / cost_price * 100, 2)
+    profit_pct = round((current_price - cost_price) / cost_price * 100, 2) if cost_price > 0 else 0
     profit_amount = round((current_price - cost_price) * shares, 2)
 
     return f"""你是一位有20年经验的A股短线交易专家。请根据以下数据给出操作建议：
+
+注意：A股买卖以"手"为单位，1手=100股，即建议的操作股数必须是100的整数倍。
 
 【股票信息】
 - 股票：{name}({symbol})
@@ -69,12 +71,13 @@ def analyze_stock(
 def _analyze_with_qwen(prompt: str) -> dict:
     """通义千问分析"""
     dashscope.api_key = DASHSCOPE_API_KEY
+    tokens = {"input": 0, "output": 0, "total": 0}
 
     try:
         response = Generation.call(
             model="qwen-max",
             messages=[
-                {"role": "system", "content": "你是一位专业的A股交易分析师，擅长技术分析。请用JSON格式回答。"},
+                {"role": "system", "content": "你是一位专业的A股交易分析师，擅长技术分析。请用JSON格式回答。注意：A股买卖以手为单位，1手=100股，操作股数必须是100的整数倍。"},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
@@ -83,17 +86,28 @@ def _analyze_with_qwen(prompt: str) -> dict:
 
         if response.status_code == 200:
             content = response.output.choices[0].message.content.strip()
-            return _parse_json(content)
+            try:
+                tokens = {
+                    "input": response.usage.input_tokens,
+                    "output": response.usage.output_tokens,
+                    "total": response.usage.total_tokens,
+                }
+            except Exception:
+                pass
+            result = _parse_json(content)
+            result["tokens"] = tokens
+            return result
     except Exception as e:
         print(f"千问分析出错: {e}")
 
-    return _fallback_result("AI分析（千问）接口调用失败")
+    return _fallback_result("AI分析（千问）接口调用失败", tokens)
 
 
 def _analyze_with_deepseek(prompt: str) -> dict:
     """DeepSeek 分析（OpenAI 兼容接口）"""
+    tokens = {"input": 0, "output": 0, "total": 0}
     if not DEEPSEEK_API_KEY:
-        return _fallback_result("未配置 DeepSeek API Key")
+        return _fallback_result("未配置 DeepSeek API Key", tokens)
 
     try:
         from openai import OpenAI
@@ -104,24 +118,35 @@ def _analyze_with_deepseek(prompt: str) -> dict:
         response = client.chat.completions.create(
             model="deepseek-v4-pro",
             messages=[
-                {"role": "system", "content": "你是一位专业的A股交易分析师，擅长技术分析。请用JSON格式回答。"},
+                {"role": "system", "content": "你是一位专业的A股交易分析师，擅长技术分析。请用JSON格式回答。注意：A股买卖以手为单位，1手=100股，操作股数必须是100的整数倍。"},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
         )
         content = response.choices[0].message.content.strip()
-        return _parse_json(content)
+        try:
+            tokens = {
+                "input": response.usage.prompt_tokens,
+                "output": response.usage.completion_tokens,
+                "total": response.usage.total_tokens,
+            }
+        except Exception:
+            pass
+        result = _parse_json(content)
+        result["tokens"] = tokens
+        return result
     except ImportError:
-        return _fallback_result("未安装 openai 库，请 pip install openai")
+        return _fallback_result("未安装 openai 库，请 pip install openai", tokens)
     except Exception as e:
         print(f"DeepSeek分析出错: {e}")
-        return _fallback_result(f"DeepSeek API 调用失败: {e}")
+        return _fallback_result(f"DeepSeek API 调用失败: {e}", tokens)
 
 
 def _analyze_with_gemini(prompt: str) -> dict:
     """Gemini 分析"""
+    tokens = {"input": 0, "output": 0, "total": 0}
     if not GOOGLE_API_KEY:
-        return _fallback_result("未配置 Google Gemini API Key")
+        return _fallback_result("未配置 Google Gemini API Key", tokens)
 
     try:
         from google import genai
@@ -135,12 +160,22 @@ def _analyze_with_gemini(prompt: str) -> dict:
             ],
         )
         content = response.text.strip()
-        return _parse_json(content)
+        try:
+            tokens = {
+                "input": response.usage_metadata.prompt_token_count,
+                "output": response.usage_metadata.candidates_token_count,
+                "total": response.usage_metadata.total_token_count,
+            }
+        except Exception:
+            pass
+        result = _parse_json(content)
+        result["tokens"] = tokens
+        return result
     except ImportError:
-        return _fallback_result("未安装 google-genai 库，请 pip install google-genai")
+        return _fallback_result("未安装 google-genai 库，请 pip install google-genai", tokens)
     except Exception as e:
         print(f"Gemini分析出错: {e}")
-        return _fallback_result(f"Gemini API 调用失败: {e}")
+        return _fallback_result(f"Gemini API 调用失败: {e}", tokens)
 
 
 def _parse_json(content: str) -> dict:
@@ -152,10 +187,11 @@ def _parse_json(content: str) -> dict:
     return json.loads(content)
 
 
-def _fallback_result(reason: str) -> dict:
+def _fallback_result(reason: str, tokens: dict = None) -> dict:
     return {
         "suggestion": "持有",
         "confidence": 50,
         "reason": reason,
         "risk_tip": "技术面分析仅供参考，请结合自身判断。",
+        "tokens": tokens or {"input": 0, "output": 0, "total": 0},
     }

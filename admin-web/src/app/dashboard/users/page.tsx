@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { adminApi, UserInfo } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function UsersPage() {
+  const { isMobile } = useMediaQuery();
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -65,13 +67,13 @@ export default function UsersPage() {
   };
 
   return (
-    <div style={{ padding: 32 }}>
+    <div style={{ padding: isMobile ? 16 : 32 }}>
       <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>用户管理</h2>
       <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>管理系统中的所有注册用户</p>
 
-      <div className="animate-fade-in" style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
+      <div className="animate-fade-in" style={{ display: "flex", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12, flexDirection: isMobile ? "column" : "row" }}>
         <div style={{ display: "flex", gap: 12 }}>
-          <input className="input" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="搜索账号或昵称..." style={{ width: 260, fontSize: 14, padding: "8px 12px" }} />
+          <input className="input" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="搜索账号或昵称..." style={{ width: isMobile ? "100%" : 260, fontSize: 14, padding: "8px 12px" }} />
           <button className="btn btn-primary" onClick={handleSearch}>搜索</button>
           {keyword && <button className="btn btn-outline" onClick={() => { setKeyword(""); setSearchInput(""); setPage(1); }}>清除</button>}
         </div>
@@ -88,7 +90,8 @@ export default function UsersPage() {
       ) : users.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>暂无用户数据</div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="card table-wrapper" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="table-wrapper">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -112,6 +115,7 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {totalPages > 1 && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "16px", borderTop: "1px solid var(--border)" }}>
               <button className="btn btn-outline" onClick={() => setPage(page - 1)} disabled={page <= 1} style={{ fontSize: 13, padding: "6px 14px" }}>上一页</button>
@@ -124,7 +128,7 @@ export default function UsersPage() {
 
       {showModal && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowModal(false)}>
-          <div className="card animate-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: 400, padding: 32, background: "var(--bg-secondary)" }}>
+          <div className="card animate-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 400, padding: 32, background: "var(--bg-secondary)", maxHeight: "90vh", overflowY: "auto" }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>{editUser ? "编辑用户" : "新增用户"}</h3>
             <div style={{ display: "grid", gap: 16 }}>
               {!editUser && <div><label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>账号</label><input className="input" value={formAccount} onChange={(e) => setFormAccount(e.target.value)} placeholder="手机号或邮箱" /></div>}

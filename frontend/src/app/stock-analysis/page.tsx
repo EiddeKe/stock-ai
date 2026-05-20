@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { api, subscriptionApi, UsageStats } from "@/lib/api";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/lib/api";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import PositionCard from "@/components/PositionCard";
 import AddPositionModal from "@/components/AddPositionModal";
 import EditPositionModal from "@/components/EditPositionModal";
@@ -36,16 +37,140 @@ interface AnalysisResult {
   risk_tip: string;
 }
 
+type PageTab = "analysis" | "recommendations";
 type ModelType = "qwen" | "deepseek" | "gemini";
 
 const MODEL_CONFIG: Record<ModelType, { label: string; icon: string }> = {
-  qwen: { label: "千问分析", icon: "✦" },
-  deepseek: { label: "DeepSeek分析", icon: "◆" },
-  gemini: { label: "Gemini分析", icon: "●" },
+  qwen: { label: "千问", icon: "✦" },
+  deepseek: { label: "DeepSeek", icon: "◆" },
+  gemini: { label: "Gemini", icon: "●" },
 };
 
+const CHAT_WIDTH = 350;
+const CHAT_WIDTH_MIN = 280;
+
 export default function StockAnalysisPage() {
+  return (
+    <Suspense fallback={<div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-primary)" }}><span className="loading-spinner" /></div>}>
+      <StockAnalysisContent />
+    </Suspense>
+  );
+}
+
+function StockAnalysisContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get("tab") === "recommendations" ? "recommendations" : "analysis";
+  const [activeTab, setActiveTab] = useState<PageTab>(initialTab);
+
+  return (
+    <AuthGuard>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-primary)" }}>
+      {/* 顶部导航 */}
+      <header className="glass" style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        height: 60,
+        borderBottom: "1px solid var(--border)",
+      }}>
+        <div style={{ maxWidth: "100%", margin: "0 auto", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, flexWrap: "wrap" }}>
+          {/* 左侧 Logo + 导航链接 */}
+          <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+              onClick={() => router.push("/")}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: "linear-gradient(135deg, var(--accent), #a855f7)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, fontWeight: 800, color: "#fff",
+              }}>
+                A
+              </div>
+              <h1 style={{ fontSize: 16, fontWeight: 700 }}>
+                <span className="gradient-text">StockAI</span>
+                <span className="hide-mobile" style={{ fontSize: 13, fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>交易指导助手</span>
+              </h1>
+            </div>
+
+            {/* 页面 Tab 切换 — 药丸分段控件 */}
+            <nav style={{
+              display: "flex", alignItems: "center",
+              background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3,
+              border: "1px solid var(--border)",
+            }}>
+              {([
+                { key: "analysis" as PageTab, label: "持仓分析", emoji: "📊" },
+                { key: "recommendations" as PageTab, label: "热门推荐", emoji: "🔥" },
+              ]).map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      router.replace(tab.key === "analysis" ? "/stock-analysis" : "/stock-analysis?tab=recommendations");
+                    }}
+                    style={{
+                      padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                      cursor: "pointer", transition: "all 0.25s ease",
+                      background: isActive ? "var(--accent)" : "transparent",
+                      color: isActive ? "#fff" : "var(--text-secondary)",
+                      border: "none",
+                      boxShadow: isActive ? "0 2px 8px rgba(99, 102, 241, 0.3)" : "none",
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--text-primary)"; } }}
+                    onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--text-secondary)"; } }}
+                  >
+                    {tab.emoji} {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* 右侧 UserMenu */}
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <UserMenu />
+          </div>
+        </div>
+      </header>
+
+      {/* 主内容区：根据 Tab 切换 */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", paddingTop: 60 }}>
+        {activeTab === "analysis" ? (
+          <AnalysisTabContent />
+        ) : (
+          <RecommendationsTabContent />
+        )}
+      </div>
+
+      {/* 底部免责声明 */}
+      <footer style={{
+        padding: "10px 20px", borderTop: "1px solid var(--border)",
+        background: "rgba(0,0,0,0.2)", textAlign: "center",
+      }}>
+        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.6 }}>
+          ⚠ 免责声明：本平台仅提供信息分析服务，AI 生成内容仅供参考，不构成任何投资建议。
+          平台不提供任何股票交易操作功能。用户应独立判断，平台不对投资盈亏承担责任。
+          <a href="/terms" target="_blank" style={{ color: "var(--accent)", textDecoration: "none" }}> 用户协议</a>
+          <a href="/privacy" target="_blank" style={{ color: "var(--accent)", textDecoration: "none", marginLeft: 8 }}> 隐私政策</a>
+        </p>
+      </footer>
+    </div>
+    </AuthGuard>
+  );
+}
+
+/* ============================================================
+ * 持仓分析 Tab 内容
+ * ============================================================ */
+function AnalysisTabContent() {
+  const { isMobile } = useMediaQuery();
   const [positions, setPositions] = useState<Position[]>([]);
   const [qwenAnalyses, setQwenAnalyses] = useState<AnalysisResult[]>([]);
   const [deepseekAnalyses, setDeepseekAnalyses] = useState<AnalysisResult[]>([]);
@@ -63,8 +188,9 @@ export default function StockAnalysisPage() {
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editPositionId, setEditPositionId] = useState<number | null>(null);
-  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [chatCollapsed, setChatCollapsed] = useState(isMobile);
   const hasLoadedOnce = useRef(false);
+  const router = useRouter();
 
   const analyses = activeModel === "qwen" ? qwenAnalyses : activeModel === "deepseek" ? deepseekAnalyses : geminiAnalyses;
   const hasDeepseek = deepseekAnalyses.length > 0;
@@ -88,14 +214,11 @@ export default function StockAnalysisPage() {
     }
   }, []);
 
-  // 页面加载时自动获取持仓数据（首次加载显示骨架屏）
   useEffect(() => {
     fetchPositions(false);
-    subscriptionApi.getUsage().then(setUsageStats).catch(() => {});
     hasLoadedOnce.current = true;
   }, [fetchPositions]);
 
-  // 每 30 秒静默刷新（不显示骨架屏，只更新数值）
   useEffect(() => {
     const interval = setInterval(() => {
       if (hasLoadedOnce.current) {
@@ -119,7 +242,6 @@ export default function StockAnalysisPage() {
     try {
       await api.updatePosition(id, data);
       setEditPositionId(null);
-      // 静默刷新，不清空分析结果
       fetchPositions(true);
     } catch (e: any) {
       alert(e.message);
@@ -148,7 +270,6 @@ export default function StockAnalysisPage() {
       setActiveModel("qwen");
       setDeepseekAnalyses([]);
       setGeminiAnalyses([]);
-      subscriptionApi.getUsage().then(setUsageStats).catch(() => {});
     } catch (e: any) {
       if (e.message.includes("已达上限")) {
         if (confirm("每日分析次数已达上限，是否前往升级套餐？")) {
@@ -200,112 +321,24 @@ export default function StockAnalysisPage() {
 
   const editPosition = positions.find((p) => p.id === editPositionId);
 
-  // 汇总统计
   const totalProfit = positions.reduce((s, p) => s + (p.profit_amount ?? 0), 0);
-  const totalCost = positions.reduce((s, p) => s + p.cost_price * p.shares, 0);
   const totalValue = positions.reduce((s, p) => s + ((p.current_price ?? p.cost_price) * p.shares), 0);
   const bestStock = positions.length > 0
     ? positions.reduce((a, b) => (a.profit_pct ?? -999) > (b.profit_pct ?? -999) ? a : b)
     : null;
 
   return (
-    <AuthGuard>
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-primary)" }}>
-      {/* 顶部导航 — 固定定位 */}
-      <header className="glass" style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        height: 60,
-        borderBottom: "1px solid var(--border)",
-      }}>
-        <div style={{ maxWidth: "100%", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: "linear-gradient(135deg, var(--accent), #a855f7)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, fontWeight: 800, color: "#fff",
-            }}>
-              A
-            </div>
-            <h1
-              style={{ fontSize: 16, fontWeight: 700, cursor: "pointer" }}
-              onClick={() => router.push("/")}
-            >
-              <span className="gradient-text">StockAI</span>
-              <span style={{ fontSize: 13, fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>交易指导助手</span>
-            </h1>
-          </div>
-          <nav style={{ display: "flex", gap: 4 }}>
-            <a
-              href="/stock-analysis"
-              style={{
-                padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600,
-                background: "var(--accent)", color: "#fff", textDecoration: "none",
-              }}
-            >
-              持仓分析
-            </a>
-            <a
-              href="/recommendations"
-              style={{
-                padding: "8px 16px", borderRadius: 8, fontSize: 14, fontWeight: 600,
-                background: "transparent", color: "var(--text-secondary)", textDecoration: "none",
-                transition: "background 0.2s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-            >
-              🔥 热门推荐
-            </a>
-          </nav>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {usageStats && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
-                borderRadius: 8, fontSize: 12,
-                background: usageStats.remaining === 0 ? "var(--up-bg)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${usageStats.remaining === 0 ? "rgba(239, 68, 68, 0.3)" : "var(--border)"}`,
-                color: usageStats.remaining === 0 ? "var(--up)" : "var(--text-muted)",
-              }}>
-                {usageStats.daily_limit === -1 ? (
-                  <span>今日: 无限制 ({usageStats.plan_name})</span>
-                ) : (
-                  <span>今日: {usageStats.today_calls}/{usageStats.daily_limit}</span>
-                )}
-                {usageStats.remaining === 0 && usageStats.daily_limit !== -1 && (
-                  <a href="/pricing" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>升级</a>
-                )}
-              </div>
-            )}
-            <UserMenu />
-            <button className="btn btn-outline" onClick={() => fetchPositions(false)} disabled={loading}>
-              {loading ? <span className="loading-spinner" /> : "⟳ 刷新"}
-            </button>
-            {refreshing && (
-              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>刷新中...</span>
-            )}
-            <button className="btn btn-primary" onClick={handleAnalyzeAll} disabled={analyzing || positions.length === 0}>
-              {analyzing ? <><span className="loading-spinner" /> AI 分析中...</> : <>✦ 智能分析</>}
-            </button>
-            <button className="btn btn-success" onClick={() => setShowAddModal(true)}>
-              ＋ 添加持仓
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* 主内容：左侧对话 + 右侧持仓 */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", paddingTop: 60 }}>
-        {/* 左侧 AI 对话面板 */}
-        <div style={{
-          width: 350, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden",
-          borderRight: "1px solid var(--border)",
+    <>
+      {/* 左侧 AI 对话面板 */}
+      {!chatCollapsed && (
+        <div style={isMobile ? {
+          position: "fixed", top: 60, left: 0, right: 0, bottom: 0, zIndex: 60,
+          display: "flex", flexDirection: "column", overflow: "hidden",
+          background: "var(--bg-primary)",
+        } : {
+          width: CHAT_WIDTH, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden",
+          borderRight: "1px solid var(--border)", position: "relative",
         }}>
-          {/* 对话模型切换 Tab */}
           <div style={{
             display: "flex", alignItems: "center", gap: 4, padding: "8px 12px",
             borderBottom: "1px solid var(--border)",
@@ -318,7 +351,7 @@ export default function StockAnalysisPage() {
                   key={model}
                   onClick={() => setChatModel(model)}
                   style={{
-                    padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600,
+                    padding: "6px 12px", borderRadius: 6, fontSize: 13, fontWeight: 600,
                     cursor: "pointer", transition: "all 0.2s",
                     background: isActive ? "var(--accent)" : "transparent",
                     color: isActive ? "#fff" : "var(--text-secondary)",
@@ -343,130 +376,190 @@ export default function StockAnalysisPage() {
               清空
             </button>
           </div>
-          {/* 对话内容 */}
           <ChatPanel
             model={chatModel}
             enableSearch={chatModel === "qwen" ? qwenEnableSearch : chatModel === "deepseek" ? deepseekEnableSearch : geminiEnableSearch}
             onEnableSearchChange={chatModel === "qwen" ? setQwenEnableSearch : chatModel === "deepseek" ? setDeepseekEnableSearch : setGeminiEnableSearch}
           />
+          <button
+            onClick={() => setChatCollapsed(true)}
+            style={isMobile ? {
+              position: "absolute", bottom: 16, right: 16,
+              width: 40, height: 40, borderRadius: "50%",
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+              color: "var(--text-muted)", cursor: "pointer", fontSize: 16,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.2s", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            } : {
+              position: "absolute", top: "50%", right: -14, transform: "translateY(-50%)",
+              width: 28, height: 56, borderRadius: "0 6px 6px 0",
+              background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "none",
+              color: "var(--text-muted)", cursor: "pointer", fontSize: 14,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.2s", zIndex: 10,
+            }}
+            title="收起对话"
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-card-hover)"; e.currentTarget.style.color = "var(--accent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+          >
+            {isMobile ? "✕" : "◀"}
+          </button>
         </div>
+      )}
 
-        {/* 右侧持仓与分析 */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 20px" }}>
-          {/* 错误提示 */}
-          {error && (
-            <div className="animate-fade-in" style={{
-              marginBottom: 20, padding: "12px 16px", borderRadius: 10,
-              background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "var(--up)", fontSize: 14,
-            }}>
-              {error}
-            </div>
-          )}
+      {chatCollapsed && (
+        <button
+          onClick={() => setChatCollapsed(false)}
+          style={isMobile ? {
+            position: "fixed", bottom: 16, left: 16, zIndex: 40,
+            width: 44, height: 44, borderRadius: "50%",
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            color: "var(--text-muted)", cursor: "pointer", fontSize: 16,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s", boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          } : {
+            position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 40,
+            width: 28, height: 56, borderRadius: "0 6px 6px 0",
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            color: "var(--text-muted)", cursor: "pointer", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s",
+          }}
+          title="展开对话"
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-card-hover)"; e.currentTarget.style.color = "var(--accent)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-card)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+        >
+          {isMobile ? "💬" : "▶"}
+        </button>
+      )}
 
-          {/* 统计仪表盘 */}
-          {positions.length > 0 && (
-            <div className="animate-fade-in" style={{
-              display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24,
-            }}>
-              <StatCard label="持仓数量" value={`${positions.length} 只`} icon="📊" />
-              <StatCard label="总市值" value={`¥${totalValue.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon="💰" />
-              <StatCard
-                label="总盈亏"
-                value={`${totalProfit >= 0 ? "+" : ""}¥${totalProfit.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                isUp={totalProfit >= 0}
-                icon={totalProfit >= 0 ? "📈" : "📉"}
-              />
-              <StatCard
-                label="最佳表现"
-                value={bestStock ? `${bestStock.name} ${bestStock.profit_pct != null ? (bestStock.profit_pct >= 0 ? "+" : "") + bestStock.profit_pct + "%" : "--"}` : "--"}
-                isUp={(bestStock?.profit_pct ?? 0) >= 0}
-                icon="🏆"
-              />
-            </div>
-          )}
+      {/* 右侧持仓与分析 */}
+      <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px 12px" : "24px 20px" }}>
+        {error && (
+          <div className="animate-fade-in" style={{
+            marginBottom: 20, padding: "12px 16px", borderRadius: 10,
+            background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)",
+            color: "var(--up)", fontSize: 14,
+          }}>
+            {error}
+          </div>
+        )}
 
-          {/* 持仓列表 */}
-          {loading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="card" style={{ height: 180 }}>
-                  <div className="skeleton" style={{ width: 80, height: 18, marginBottom: 8 }} />
-                  <div className="skeleton" style={{ width: 50, height: 14, marginBottom: 20 }} />
-                  <div className="skeleton" style={{ width: "100%", height: 40 }} />
-                </div>
-              ))}
+        {positions.length > 0 && (
+          <div className="animate-fade-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>
+                <span className="gradient-text">持仓分析</span>
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--text-muted)" }}>管理持仓，AI 实时分析建议</p>
             </div>
-          ) : positions.length === 0 ? (
-            <div className="animate-fade-in" style={{
-              textAlign: "center", padding: "80px 20px",
-            }}>
-              <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📊</div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>
-                暂无持仓股票
-              </h3>
-              <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>
-                添加你的持仓股票，AI 将为你提供实时分析和操作建议
-              </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-primary" onClick={handleAnalyzeAll} disabled={analyzing || positions.length === 0}>
+                {analyzing ? <><span className="loading-spinner" /> AI 分析中...</> : <>✦ 智能分析</>}
+              </button>
               <button className="btn btn-success" onClick={() => setShowAddModal(true)}>
-                ＋ 添加第一只股票
+                ＋ 添加持仓
               </button>
             </div>
-          ) : (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 16,
-              marginBottom: analyses.length > 0 ? 24 : 0,
-            }}>
-              {positions.map((p, i) => (
-                <div key={p.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
-                  <PositionCard position={p} onDelete={handleDelete} onEdit={(id) => setEditPositionId(id)} />
-                </div>
-              ))}
-            </div>
-          )}
+          </div>
+        )}
 
-          {/* AI 分析结果（带模型切换 Tab） */}
-          {(qwenAnalyses.length > 0 || deepseekAnalyses.length > 0 || geminiAnalyses.length > 0) && (
-            <div className="animate-fade-in">
-              {/* 模型切换 Tab */}
-              <div style={{
-                display: "flex", gap: 8, marginBottom: 20,
-                background: "var(--bg-primary)", borderRadius: 10, padding: 4,
-                border: "1px solid var(--border)", width: "fit-content",
-              }}>
-                {(["qwen", "deepseek", "gemini"] as ModelType[]).map((model) => {
-                  const cfg = MODEL_CONFIG[model];
-                  const isActive = activeModel === model;
-                  const isLoading = model === "deepseek" ? deepseekLoading : model === "gemini" ? geminiLoading : false;
-                  return (
-                    <button
-                      key={model}
-                      onClick={() => handleModelSwitch(model)}
-                      style={{
-                        padding: "8px 20px", borderRadius: 8, fontSize: 14, fontWeight: 600,
-                        cursor: "pointer", transition: "all 0.2s",
-                        background: isActive ? "var(--accent)" : "transparent",
-                        color: isActive ? "#fff" : "var(--text-secondary)",
-                        border: isActive ? "none" : "1px solid transparent",
-                        opacity: isLoading ? 0.6 : 1,
-                      }}
-                    >
-                      {isLoading ? (
-                        <><span className="loading-spinner" style={{ marginRight: 6 }} /> {cfg.label}中</>
-                      ) : (
-                        <>{cfg.icon} {cfg.label}</>
-                      )}
-                    </button>
-                  );
-                })}
+        {positions.length > 0 && (
+          <div className="animate-fade-in grid-responsive-4" style={{ marginBottom: 24 }}>
+            <StatCard label="持仓数量" value={`${positions.length} 只`} icon="📊" />
+            <StatCard label="总市值" value={`¥${totalValue.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon="💰" />
+            <StatCard
+              label="总盈亏"
+              value={`${totalProfit >= 0 ? "+" : ""}¥${totalProfit.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              isUp={totalProfit >= 0}
+              icon={totalProfit >= 0 ? "📈" : "📉"}
+            />
+            <StatCard
+              label="最佳表现"
+              value={bestStock ? `${bestStock.name} ${bestStock.profit_pct != null ? (bestStock.profit_pct >= 0 ? "+" : "") + bestStock.profit_pct + "%" : "--"}` : "--"}
+              isUp={(bestStock?.profit_pct ?? 0) >= 0}
+              icon="🏆"
+            />
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card" style={{ height: 180 }}>
+                <div className="skeleton" style={{ width: 80, height: 18, marginBottom: 8 }} />
+                <div className="skeleton" style={{ width: 50, height: 14, marginBottom: 20 }} />
+                <div className="skeleton" style={{ width: "100%", height: 40 }} />
               </div>
+            ))}
+          </div>
+        ) : positions.length === 0 ? (
+          <div className="animate-fade-in" style={{
+            textAlign: "center", padding: "80px 20px",
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📊</div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>
+              暂无持仓股票
+            </h3>
+            <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>
+              添加你的持仓股票，AI 将为你提供实时分析和操作建议
+            </p>
+            <button className="btn btn-success" onClick={() => setShowAddModal(true)}>
+              ＋ 添加第一只股票
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 16,
+            marginBottom: analyses.length > 0 ? 24 : 0,
+          }}>
+            {positions.map((p, i) => (
+              <div key={p.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.05}s` }}>
+                <PositionCard position={p} onDelete={handleDelete} onEdit={(id) => setEditPositionId(id)} />
+              </div>
+            ))}
+          </div>
+        )}
 
-              <AnalysisPanel results={analyses} model={activeModel} />
+        {(qwenAnalyses.length > 0 || deepseekAnalyses.length > 0 || geminiAnalyses.length > 0) && (
+          <div className="animate-fade-in">
+            <div style={{
+              display: "flex", gap: 8, marginBottom: 20,
+              background: "var(--bg-primary)", borderRadius: 10, padding: 4,
+              border: "1px solid var(--border)", width: "fit-content",
+            }}>
+              {(["qwen", "deepseek", "gemini"] as ModelType[]).map((model) => {
+                const cfg = MODEL_CONFIG[model];
+                const isActive = activeModel === model;
+                const isLoading = model === "deepseek" ? deepseekLoading : model === "gemini" ? geminiLoading : false;
+                return (
+                  <button
+                    key={model}
+                    onClick={() => handleModelSwitch(model)}
+                    style={{
+                      padding: "8px 20px", borderRadius: 8, fontSize: 14, fontWeight: 600,
+                      cursor: "pointer", transition: "all 0.2s",
+                      background: isActive ? "var(--accent)" : "transparent",
+                      color: isActive ? "#fff" : "var(--text-secondary)",
+                      border: isActive ? "none" : "1px solid transparent",
+                      opacity: isLoading ? 0.6 : 1,
+                    }}
+                  >
+                    {isLoading ? (
+                      <><span className="loading-spinner" style={{ marginRight: 6 }} /> {cfg.label}中</>
+                    ) : (
+                      <>{cfg.icon} {cfg.label}</>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            <AnalysisPanel results={analyses} model={activeModel} />
+          </div>
+        )}
       </div>
 
       {showAddModal && (
@@ -483,8 +576,302 @@ export default function StockAnalysisPage() {
           onSubmit={handleEdit}
         />
       )}
+    </>
+  );
+}
+
+/* ============================================================
+ * 热门推荐 Tab 内容
+ * ============================================================ */
+function RecommendationsTabContent() {
+  const { isMobile } = useMediaQuery();
+  const [sectors, setSectors] = useState<SectorRecommendation[]>([]);
+  const [qwenSectors, setQwenSectors] = useState<SectorRecommendation[]>([]);
+  const [deepseekSectors, setDeepseekSectors] = useState<SectorRecommendation[]>([]);
+  const [geminiSectors, setGeminiSectors] = useState<SectorRecommendation[]>([]);
+  const [activeModel, setActiveModel] = useState<ModelType>("qwen");
+  const [loading, setLoading] = useState(false);
+  const [deepseekLoading, setDeepseekLoading] = useState(false);
+  const [geminiLoading, setGeminiLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [expandedSector, setExpandedSector] = useState<string | null>(null);
+  const hasLoadedOnce = useRef(false);
+
+  const fetchRecommendations = useCallback(async (model: ModelType, isSwitch = false) => {
+    if (!isSwitch) {
+      setLoading(true);
+    } else {
+      if (model === "deepseek") setDeepseekLoading(true);
+      if (model === "gemini") setGeminiLoading(true);
+    }
+    setError("");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/recommendations?model=${model}`);
+      if (!res.ok) throw new Error("获取推荐数据失败");
+      const json = await res.json();
+      if (model === "qwen") {
+        setQwenSectors(json.data || []);
+      } else if (model === "deepseek") {
+        setDeepseekSectors(json.data || []);
+      } else {
+        setGeminiSectors(json.data || []);
+      }
+      setSectors(model === "qwen" ? (json.data || []) : model === "deepseek" ? deepseekSectors : geminiSectors);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      if (!isSwitch) {
+        setLoading(false);
+      } else {
+        if (model === "deepseek") setDeepseekLoading(false);
+        if (model === "gemini") setGeminiLoading(false);
+      }
+    }
+  }, [deepseekSectors, geminiSectors]);
+
+  useEffect(() => {
+    if (!hasLoadedOnce.current) {
+      fetchRecommendations("qwen");
+      hasLoadedOnce.current = true;
+    }
+  }, [fetchRecommendations]);
+
+  const handleModelSwitch = (model: ModelType) => {
+    setActiveModel(model);
+    setExpandedSector(null);
+    if (model === "qwen") {
+      setSectors(qwenSectors);
+    } else if (model === "deepseek") {
+      if (deepseekSectors.length > 0) {
+        setSectors(deepseekSectors);
+      } else {
+        fetchRecommendations("deepseek", true);
+      }
+    } else {
+      if (geminiSectors.length > 0) {
+        setSectors(geminiSectors);
+      } else {
+        fetchRecommendations("gemini", true);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (activeModel === "qwen") {
+      setSectors(qwenSectors);
+    } else if (activeModel === "deepseek" && deepseekSectors.length > 0) {
+      setSectors(deepseekSectors);
+    } else if (activeModel === "gemini" && geminiSectors.length > 0) {
+      setSectors(geminiSectors);
+    }
+  }, [activeModel, qwenSectors, deepseekSectors, geminiSectors]);
+
+  const isLoading = activeModel === "deepseek" ? deepseekLoading : activeModel === "gemini" ? geminiLoading : loading;
+  const currentSectors = activeModel === "qwen" ? qwenSectors : activeModel === "deepseek" ? deepseekSectors : geminiSectors;
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px 12px" : "24px 20px" }}>
+      {/* 内容区工具栏：模型切换 + 刷新 */}
+      <div className="animate-fade-in" style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24,
+        padding: "12px 16px", borderRadius: 12,
+        background: "var(--bg-card)", border: "1px solid var(--border)",
+      }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>
+            🔥 <span className="gradient-text">热门推荐</span>
+          </h2>
+          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+            基于实时数据和 AI 分析，推荐潜力行业和个股 — {MODEL_CONFIG[activeModel].label}
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* 模型切换 */}
+          <div style={{
+            display: "flex", gap: 4, background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: 3,
+            border: "1px solid var(--border)",
+          }}>
+            {(["qwen", "deepseek", "gemini"] as ModelType[]).map((model) => {
+              const cfg = MODEL_CONFIG[model];
+              const isActive = activeModel === model;
+              const isLoading = (model === "deepseek" && deepseekLoading) || (model === "gemini" && geminiLoading);
+              return (
+                <button
+                  key={model}
+                  onClick={() => handleModelSwitch(model)}
+                  style={{
+                    padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", transition: "all 0.2s",
+                    background: isActive ? "var(--accent)" : "transparent",
+                    color: isActive ? "#fff" : "var(--text-secondary)",
+                    border: isActive ? "none" : "1px solid transparent",
+                    opacity: isLoading ? 0.6 : 1,
+                  }}
+                >
+                  {isLoading ? (
+                    <><span className="loading-spinner" style={{ marginRight: 4 }} /> 分析中</>
+                  ) : (
+                    <>{cfg.icon} {cfg.label === "千问" ? "千问推荐" : cfg.label === "DeepSeek" ? "DeepSeek推荐" : "Gemini推荐"}</>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {/* 刷新按钮 */}
+          <button className="btn btn-outline" onClick={() => fetchRecommendations(activeModel, activeModel !== "qwen")} disabled={loading} style={{ fontSize: 13, padding: "6px 14px" }}>
+            {loading ? <span className="loading-spinner" /> : "⟳ 刷新"}
+          </button>
+        </div>
+      </div>
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="animate-fade-in" style={{
+          marginBottom: 20, padding: "12px 16px", borderRadius: 10,
+          background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)",
+          color: "var(--up)", fontSize: 14,
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* 加载状态 */}
+      {isLoading ? (
+        <div style={{ display: "grid", gap: 20 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card" style={{ padding: 24, height: 180 }}>
+              <div className="skeleton" style={{ width: 120, height: 20, marginBottom: 12 }} />
+              <div className="skeleton" style={{ width: "60%", height: 14, marginBottom: 8 }} />
+              <div className="skeleton" style={{ width: "80%", height: 14, marginBottom: 8 }} />
+              <div className="skeleton" style={{ width: "40%", height: 14 }} />
+            </div>
+          ))}
+        </div>
+      ) : currentSectors.length === 0 ? (
+        <div className="animate-fade-in" style={{
+          textAlign: "center", padding: "80px 20px",
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🔥</div>
+          <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>
+            暂无推荐数据
+          </h3>
+          <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>
+            请确保在交易时间段内使用，或在非交易时间刷新获取最新数据
+          </p>
+          <button className="btn btn-primary" onClick={() => fetchRecommendations(activeModel, activeModel !== "qwen")}>
+            重新获取
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 20 }}>
+          {currentSectors.map((sector, i) => (
+            <div
+              key={sector.sector_name + i}
+              className="card animate-fade-in-up"
+              style={{ padding: 24, animationDelay: `${i * 0.08}s` }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700 }}>{sector.sector_name}</h3>
+                  <span
+                    style={{
+                      padding: "4px 10px", borderRadius: 6, fontSize: 13, fontWeight: 600,
+                      background: sector.sector_change_pct >= 0 ? "rgba(239, 68, 68, 0.15)" : "rgba(34, 197, 94, 0.15)",
+                      color: sector.sector_change_pct >= 0 ? "var(--up)" : "var(--down)",
+                      border: `1px solid ${sector.sector_change_pct >= 0 ? "rgba(239, 68, 68, 0.3)" : "rgba(34, 197, 94, 0.3)"}`,
+                    }}
+                  >
+                    {sector.sector_change_pct >= 0 ? "+" : ""}{sector.sector_change_pct}%
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>推荐指数</span>
+                  <span
+                    style={{
+                      fontSize: 14, fontWeight: 700,
+                      color: sector.recommend_score >= 70 ? "var(--up)" : sector.recommend_score >= 50 ? "#f59e0b" : "var(--down)",
+                    }}
+                  >
+                    {sector.recommend_score}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+                <InfoBlock label="推荐理由" value={sector.recommend_reason} color="var(--text-primary)" />
+                <InfoBlock label="成长潜力" value={sector.growth_potential} color="var(--accent)" />
+                <InfoBlock label="政策环境" value={sector.policy_support} color="#10b981" />
+              </div>
+
+              <div style={{
+                padding: "10px 14px", borderRadius: 8, fontSize: 13,
+                background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.2)",
+                color: "#f59e0b", marginBottom: 16,
+              }}>
+                ⚠ {sector.risk_warning}
+              </div>
+
+              {sector.stock_recommendations && sector.stock_recommendations.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setExpandedSector(expandedSector === sector.sector_name ? null : sector.sector_name)}
+                    style={{
+                      background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)",
+                      borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer",
+                      color: "var(--text-secondary)", width: "100%", textAlign: "left",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                    }}
+                  >
+                    <span>📋 推荐个股 ({sector.stock_recommendations.length}只)</span>
+                    <span style={{ transform: expandedSector === sector.sector_name ? "rotate(180deg)" : "", transition: "transform 0.2s" }}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {expandedSector === sector.sector_name && (
+                    <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                      {sector.stock_recommendations.map((stock, j) => (
+                        <div
+                          key={j}
+                          style={{
+                            padding: "12px 16px", borderRadius: 8,
+                            background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontWeight: 600, fontSize: 14 }}>{stock.name}</span>
+                              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{stock.symbol}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>¥{stock.current_price}</span>
+                              <span
+                                style={{
+                                  fontSize: 12, fontWeight: 600,
+                                  color: stock.change_pct >= 0 ? "var(--up)" : "var(--down)",
+                                }}
+                              >
+                                {stock.change_pct >= 0 ? "+" : ""}{stock.change_pct}%
+                              </span>
+                            </div>
+                          </div>
+                          <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, lineHeight: 1.5 }}>
+                            {stock.recommend_reason}
+                          </p>
+                          <p style={{ fontSize: 12, color: "#f59e0b" }}>
+                            风险：{stock.risk_tip}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-    </AuthGuard>
   );
 }
 
@@ -505,4 +892,33 @@ function StatCard({ label, value, isUp, icon }: {
       </div>
     </div>
   );
+}
+
+function InfoBlock({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
+      <p style={{ fontSize: 13.5, color, lineHeight: 1.6, margin: "4px 0 0 0" }}>{value}</p>
+    </div>
+  );
+}
+
+interface SectorRecommendation {
+  sector_name: string;
+  sector_change_pct: number;
+  recommend_reason: string;
+  growth_potential: string;
+  policy_support: string;
+  risk_warning: string;
+  recommend_score: number;
+  stock_recommendations: StockRecommendation[];
+}
+
+interface StockRecommendation {
+  symbol: string;
+  name: string;
+  current_price: number;
+  change_pct: number;
+  recommend_reason: string;
+  risk_tip: string;
 }

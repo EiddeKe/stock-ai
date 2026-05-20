@@ -41,7 +41,7 @@ export default function SubscriptionModal({ planCode, planName, billingCycle, pr
       <div
         className="animate-fade-in"
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 400, borderRadius: 16, padding: "32px 28px", background: "var(--bg-secondary)", border: "1px solid var(--border)", boxShadow: "0 16px 64px rgba(0,0,0,0.4)" }}
+        style={{ width: "calc(100% - 32px)", maxWidth: 400, borderRadius: 16, padding: "32px 28px", background: "var(--bg-secondary)", border: "1px solid var(--border)", boxShadow: "0 16px 64px rgba(0,0,0,0.4)", maxHeight: "90vh", overflowY: "auto" }}
       >
         {step === "confirm" && (
           <>

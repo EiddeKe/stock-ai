@@ -22,8 +22,12 @@ def list_positions(db: Session = Depends(get_db), token: str = Depends(auth_head
         resp = PositionResponse.model_validate(p)
         if quote:
             resp.current_price = quote["current_price"]
-            resp.profit_pct = round((quote["current_price"] - p.cost_price) / p.cost_price * 100, 2)
-            resp.profit_amount = round((quote["current_price"] - p.cost_price) * p.shares, 2)
+            if p.cost_price > 0:
+                resp.profit_pct = round((quote["current_price"] - p.cost_price) / p.cost_price * 100, 2)
+                resp.profit_amount = round((quote["current_price"] - p.cost_price) * p.shares, 2)
+            else:
+                resp.profit_pct = 0
+                resp.profit_amount = 0
             resp.change_pct = quote.get("change_pct")
         result.append(resp)
     return result

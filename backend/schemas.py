@@ -139,3 +139,9 @@ class UsageStats(BaseModel):
     remaining: int
     plan_name: str
     plan_code: str
+    monthly_cost: float = 0.0
+    monthly_budget: float = -1
+
+
+class InvestmentStyleUpdate(BaseModel):
+    investment_style: str

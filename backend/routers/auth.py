@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
+from schemas import InvestmentStyleUpdate
 from services.auth_service import hash_password, verify_password, create_token, decode_token
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
@@ -21,7 +22,6 @@ def validate_account(account: str) -> bool:
 
 def get_current_user(token: str, db: Session = Depends(get_db)) -> User:
     """从 JWT token 解析当前用户"""
-    from fastapi import Header, HTTPException
     user_id = decode_token(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="无效的登录凭证")
@@ -36,6 +36,13 @@ def auth_header(authorization: str | None = Header(default=None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="缺少认证信息")
     return authorization.split(" ", 1)[1]
+
+
+def get_current_user_dep(
+    token: str = Depends(auth_header),
+    db: Session = Depends(get_db),
+) -> User:
+    return get_current_user(token, db)
 
 
 class RegisterReq(BaseModel):
@@ -84,18 +91,19 @@ def login(req: LoginReq, db: Session = Depends(get_db)):
 
 
 @router.get("/me")
-def me(user: User = Depends(lambda db, token: get_current_user(token, db))):
+def me(user: User = Depends(get_current_user_dep)):
     """获取当前用户信息"""
     return {
         "id": user.id,
         "account": user.account,
         "nickname": user.nickname,
         "agreed_terms_at": user.agreed_terms_at.isoformat() if user.agreed_terms_at else None,
+        "investment_style": user.investment_style,
     }
 
 
 @router.post("/me/agree-terms")
-def agree_terms(user: User = Depends(lambda db, token: get_current_user(token, db)), db: Session = Depends(get_db)):
+def agree_terms(user: User = Depends(get_current_user_dep), db: Session = Depends(get_db)):
     """记录用户同意协议和隐私政策"""
     user.agreed_terms_at = datetime.now()
     db.commit()
@@ -107,7 +115,7 @@ def update_me(
     nickname: str | None = None,
     old_password: str | None = None,
     new_password: str | None = None,
-    user: User = Depends(lambda db, token: get_current_user(token, db)),
+    user: User = Depends(get_current_user_dep),
     db: Session = Depends(get_db),
 ):
     """修改昵称或密码"""
@@ -123,3 +131,23 @@ def update_me(
         user.hashed_pwd = hash_password(new_password)
     db.commit()
     return {"message": "已更新", "user": {"id": user.id, "account": user.account, "nickname": user.nickname}}
+
+
+@router.get("/me/investment-style")
+def get_investment_style(user: User = Depends(get_current_user_dep)):
+    """获取当前用户的投资风格"""
+    return {"investment_style": user.investment_style}
+
+
+@router.put("/me/investment-style")
+def update_investment_style(
+    data: InvestmentStyleUpdate,
+    user: User = Depends(get_current_user_dep),
+    db: Session = Depends(get_db),
+):
+    """更新投资风格"""
+    if data.investment_style not in ("short_term", "long_term"):
+        raise HTTPException(status_code=400, detail="无效的投资风格，请选择短线或长线")
+    user.investment_style = data.investment_style
+    db.commit()
+    return {"message": "已更新", "investment_style": user.investment_style}
