@@ -87,6 +87,8 @@ def login(req: LoginReq, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.account == req.account).first()
     if not user or not verify_password(req.password, user.hashed_pwd):
         raise HTTPException(status_code=401, detail="账号或密码错误")
+    user.last_login = datetime.now()
+    db.commit()
     return {"token": create_token(user.id), "user": {"id": user.id, "account": user.account, "nickname": user.nickname}}
 
 

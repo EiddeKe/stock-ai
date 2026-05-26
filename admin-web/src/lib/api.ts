@@ -67,6 +67,7 @@ export interface UserInfo {
   nickname: string;
   created_at: string;
   updated_at: string | null;
+  last_login: string | null;
 }
 
 export interface AdminInfo {

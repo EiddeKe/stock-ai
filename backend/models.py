@@ -15,6 +15,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     investment_style = Column(String(20), nullable=True, comment="投资风格: short_term/long_term")
+    last_login = Column(DateTime, nullable=True, comment="最近登录时间")
 
     positions = relationship("Position", back_populates="owner")
     chat_messages = relationship("ChatMessage", back_populates="owner")

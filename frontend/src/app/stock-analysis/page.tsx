@@ -73,75 +73,77 @@ function StockAnalysisContent() {
         left: 0,
         right: 0,
         zIndex: 50,
-        height: 60,
         borderBottom: "1px solid var(--border)",
       }}>
-        <div style={{ maxWidth: "100%", margin: "0 auto", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60, flexWrap: "wrap" }}>
-          {/* 左侧 Logo + 导航链接 */}
-          <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
-              onClick={() => router.push("/")}
-            >
-              <div style={{
-                width: 32, height: 32, borderRadius: 8,
-                background: "linear-gradient(135deg, var(--accent), #a855f7)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 16, fontWeight: 800, color: "#fff",
-              }}>
-                A
+        <div style={{ maxWidth: "100%", margin: "0 auto", padding: "8px 12px 0", display: "flex", flexDirection: "column", height: 68 }}>
+          {/* 上行：Logo + Tab + UserMenu */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+            {/* 左侧 Logo + 导航链接 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+                onClick={() => router.push("/")}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "linear-gradient(135deg, var(--accent), #a855f7)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 16, fontWeight: 800, color: "#fff",
+                }}>
+                  A
+                </div>
+                <h1 style={{ fontSize: 16, fontWeight: 700 }}>
+                  <span className="gradient-text">StockAI</span>
+                  <span className="hide-mobile" style={{ fontSize: 13, fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>交易指导助手</span>
+                </h1>
               </div>
-              <h1 style={{ fontSize: 16, fontWeight: 700 }}>
-                <span className="gradient-text">StockAI</span>
-                <span className="hide-mobile" style={{ fontSize: 13, fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>交易指导助手</span>
-              </h1>
+
+              {/* 页面 Tab 切换 — 药丸分段控件 */}
+              <nav style={{
+                display: "flex", alignItems: "center",
+                background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3,
+                border: "1px solid var(--border)",
+              }}>
+                {([
+                  { key: "analysis" as PageTab, label: "持仓分析", emoji: "📊" },
+                  { key: "recommendations" as PageTab, label: "热门推荐", emoji: "🔥" },
+                ]).map((tab) => {
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        router.replace(tab.key === "analysis" ? "/stock-analysis" : "/stock-analysis?tab=recommendations");
+                      }}
+                      style={{
+                        padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                        cursor: "pointer", transition: "all 0.25s ease",
+                        background: isActive ? "var(--accent)" : "transparent",
+                        color: isActive ? "#fff" : "var(--text-secondary)",
+                        border: "none",
+                        boxShadow: isActive ? "0 2px 8px rgba(99, 102, 241, 0.3)" : "none",
+                      }}
+                      onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--text-primary)"; } }}
+                      onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--text-secondary)"; } }}
+                    >
+                      {tab.emoji} {tab.label}
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
 
-            {/* 页面 Tab 切换 — 药丸分段控件 */}
-            <nav style={{
-              display: "flex", alignItems: "center",
-              background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 3,
-              border: "1px solid var(--border)",
-            }}>
-              {([
-                { key: "analysis" as PageTab, label: "持仓分析", emoji: "📊" },
-                { key: "recommendations" as PageTab, label: "热门推荐", emoji: "🔥" },
-              ]).map((tab) => {
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => {
-                      setActiveTab(tab.key);
-                      router.replace(tab.key === "analysis" ? "/stock-analysis" : "/stock-analysis?tab=recommendations");
-                    }}
-                    style={{
-                      padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                      cursor: "pointer", transition: "all 0.25s ease",
-                      background: isActive ? "var(--accent)" : "transparent",
-                      color: isActive ? "#fff" : "var(--text-secondary)",
-                      border: "none",
-                      boxShadow: isActive ? "0 2px 8px rgba(99, 102, 241, 0.3)" : "none",
-                    }}
-                    onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--text-primary)"; } }}
-                    onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--text-secondary)"; } }}
-                  >
-                    {tab.emoji} {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* 右侧 UserMenu */}
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <UserMenu />
+            {/* 右侧 UserMenu */}
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>
 
       {/* 主内容区：根据 Tab 切换 */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", paddingTop: 60 }}>
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", paddingTop: 68 }}>
         {activeTab === "analysis" ? (
           <AnalysisTabContent />
         ) : (
@@ -189,6 +191,8 @@ function AnalysisTabContent() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editPositionId, setEditPositionId] = useState<number | null>(null);
   const [chatCollapsed, setChatCollapsed] = useState(isMobile);
+  const [chatWidth, setChatWidth] = useState(CHAT_WIDTH);
+  const dragging = useRef(false);
   const hasLoadedOnce = useRef(false);
   const router = useRouter();
 
@@ -227,6 +231,40 @@ function AnalysisTabContent() {
     }, 30000);
     return () => clearInterval(interval);
   }, [fetchPositions]);
+
+  // 拖拽调整聊天面板宽度
+  useEffect(() => {
+    if (isMobile) return;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const newWidth = Math.max(CHAT_WIDTH_MIN, Math.min(window.innerWidth * 0.75, e.clientX));
+      setChatWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      dragging.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isMobile]);
+
+  const streamingStarted = useRef(false);
+
+  // 用户发送消息时展开到50%屏宽，流式结束后保持当前宽度
+  const handleStreamingLength = useCallback((len: number) => {
+    if (isMobile || chatCollapsed) return;
+    if (len > 0 && !streamingStarted.current) {
+      streamingStarted.current = true;
+      setChatWidth(window.innerWidth * 0.5);
+    } else if (len === 0) {
+      streamingStarted.current = false;
+    }
+  }, [isMobile, chatCollapsed]);
 
   const handleAdd = async (data: { symbol: string; name: string; cost_price: number; shares: number }) => {
     try {
@@ -332,12 +370,13 @@ function AnalysisTabContent() {
       {/* 左侧 AI 对话面板 */}
       {!chatCollapsed && (
         <div style={isMobile ? {
-          position: "fixed", top: 60, left: 0, right: 0, bottom: 0, zIndex: 60,
+          position: "fixed", top: 68, left: 0, right: 0, bottom: 0, zIndex: 60,
           display: "flex", flexDirection: "column", overflow: "hidden",
           background: "var(--bg-primary)",
         } : {
-          width: CHAT_WIDTH, flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden",
-          borderRight: "1px solid var(--border)", position: "relative",
+          width: chatWidth, minWidth: CHAT_WIDTH_MIN, maxWidth: "75vw",
+          flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden",
+          borderRight: "none", position: "relative",
         }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 4, padding: "8px 12px",
@@ -380,21 +419,23 @@ function AnalysisTabContent() {
             model={chatModel}
             enableSearch={chatModel === "qwen" ? qwenEnableSearch : chatModel === "deepseek" ? deepseekEnableSearch : geminiEnableSearch}
             onEnableSearchChange={chatModel === "qwen" ? setQwenEnableSearch : chatModel === "deepseek" ? setDeepseekEnableSearch : setGeminiEnableSearch}
+            onStreamingLength={handleStreamingLength}
           />
+          {/* 收起按钮 */}
           <button
             onClick={() => setChatCollapsed(true)}
             style={isMobile ? {
               position: "absolute", bottom: 16, right: 16,
-              width: 40, height: 40, borderRadius: "50%",
+              width: 32, height: 32, borderRadius: "50%",
               background: "var(--bg-card)", border: "1px solid var(--border)",
-              color: "var(--text-muted)", cursor: "pointer", fontSize: 16,
+              color: "var(--text-muted)", cursor: "pointer", fontSize: 12,
               display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.2s", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+              transition: "all 0.2s", zIndex: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
             } : {
-              position: "absolute", top: "50%", right: -14, transform: "translateY(-50%)",
-              width: 28, height: 56, borderRadius: "0 6px 6px 0",
+              position: "absolute", top: "50%", right: -8, transform: "translateY(-50%)",
+              width: 20, height: 48, borderRadius: "0 4px 4px 0",
               background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "none",
-              color: "var(--text-muted)", cursor: "pointer", fontSize: 14,
+              color: "var(--text-muted)", cursor: "pointer", fontSize: 10,
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 0.2s", zIndex: 10,
             }}
@@ -404,24 +445,38 @@ function AnalysisTabContent() {
           >
             {isMobile ? "✕" : "◀"}
           </button>
+          {/* 拖拽手柄 */}
+          {!isMobile && (
+            <div
+              onMouseDown={(e) => {
+                dragging.current = true;
+                e.preventDefault();
+              }}
+              style={{
+                position: "absolute", top: 0, right: 0, bottom: 0,
+                width: 6, cursor: "col-resize", zIndex: 20,
+              }}
+            />
+          )}
         </div>
       )}
 
+      {/* 拖拽遮罩 + 收起后的展开按钮 */}
       {chatCollapsed && (
         <button
           onClick={() => setChatCollapsed(false)}
           style={isMobile ? {
             position: "fixed", bottom: 16, left: 16, zIndex: 40,
-            width: 44, height: 44, borderRadius: "50%",
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            color: "var(--text-muted)", cursor: "pointer", fontSize: 16,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.2s", boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-          } : {
-            position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 40,
-            width: 28, height: 56, borderRadius: "0 6px 6px 0",
+            width: 36, height: 36, borderRadius: "50%",
             background: "var(--bg-card)", border: "1px solid var(--border)",
             color: "var(--text-muted)", cursor: "pointer", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s", boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          } : {
+            position: "fixed", left: 0, top: "50%", transform: "translateY(-50%)", zIndex: 40,
+            width: 20, height: 48, borderRadius: "0 4px 4px 0",
+            background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "none",
+            color: "var(--text-muted)", cursor: "pointer", fontSize: 10,
             display: "flex", alignItems: "center", justifyContent: "center",
             transition: "all 0.2s",
           }}
@@ -452,6 +507,7 @@ function AnalysisTabContent() {
                 <span className="gradient-text">持仓分析</span>
               </h2>
               <p style={{ fontSize: 13, color: "var(--text-muted)" }}>管理持仓，AI 实时分析建议</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>交易不靠直觉，AI 实时客观分析，决策更从容</p>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-primary" onClick={handleAnalyzeAll} disabled={analyzing || positions.length === 0}>

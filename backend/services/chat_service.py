@@ -2,6 +2,7 @@
 import json
 import time
 import requests
+from datetime import datetime
 from config import DASHSCOPE_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY
 from dashscope import Generation
 
@@ -9,6 +10,13 @@ from dashscope import Generation
 SYSTEM_PROMPT = """你是一位拥有 20 年经验的 A 股交易高手，精通技术指标分析（MACD/KDJ/RSI/布林带/均线等）和行业资讯解读。你每天与用户交流持仓股票的行情走势，给出操作建议。用户正在与你进行持续对话，请结合上下文回答问题。
 
 注意：A 股买卖以"手"为单位，1 手 = 100 股，即买入或卖出的股数必须是 100 的整数倍。给出操作建议时请遵循此规则。"""
+
+
+def get_current_time_str() -> str:
+    """返回当前北京时间字符串"""
+    now = datetime.now()
+    return now.strftime("%Y年%m月%d日 %H:%M:%S（北京时间）")
+
 
 INVESTMENT_STYLE_PROMPTS = {
     "short_term": (
@@ -88,15 +96,58 @@ def get_realtime_market_context(positions: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def build_market_data_table(positions: list[dict]) -> str:
+    """构建格式化的实时行情数据表 — 以表格形式呈现，让模型能清晰识别为已提供的数据"""
+    if not positions:
+        return ""
+    rows = []
+    for p in positions:
+        try:
+            from services.quote_service import get_realtime_quote, get_daily_kline
+            from services.indicator_service import calc_indicators
+            quote = get_realtime_quote(p["symbol"])
+            if quote:
+                current = quote["current_price"]
+                change = quote.get("change_pct", 0)
+                open_p = quote.get("open_price", "--")
+                high = quote.get("high_price", "--")
+                low = quote.get("low_price", "--")
+                volume = quote.get("volume", 0)
+                profit_val = ((current - p["cost_price"]) / p["cost_price"] * 100) if p["cost_price"] > 0 else 0
+                kline = get_daily_kline(p["symbol"])
+                indicators = calc_indicators(kline)
+                ma5 = indicators.get("ma5", "--")
+                ma20 = indicators.get("ma20", "--")
+                macd_dif = indicators.get("macd_dif", "--")
+                rsi = indicators.get("rsi", "--")
+                boll_upper = indicators.get("boll_upper", "--")
+                boll_lower = indicators.get("boll_lower", "--")
+                trend_5d = indicators.get("trend_5d", "--")
+                vol_ratio = indicators.get("vol_ratio", "--")
+                rows.append(f"""【{p['name']}（{p['symbol']}）】
+  现价: {current} | 今日: {change:+.2f}% | 开盘: {open_p} | 最高: {high} | 最低: {low} | 成交量: {volume:.0f}手
+  成本: {p['cost_price']} | 盈亏: {profit_val:+.2f}% | 持有: {p['shares']}股
+  均线: MA5={ma5} MA20={ma20} | MACD-DIF={macd_dif} | RSI={rsi}
+  布林带: 上轨={boll_upper} 下轨={boll_lower} | 近5日趋势: {trend_5d:+.2f}% | 量比: {vol_ratio}""")
+            else:
+                rows.append(f"【{p['name']}（{p['symbol']}）】行情获取失败")
+        except Exception as e:
+            rows.append(f"【{p['name']}（{p['symbol']}）】行情获取失败 ({e})")
+    return "\n".join(rows)
+
+
 def build_chat_messages(
     positions_context: str,
     history: list[dict],
     user_message: str,
     search_context: str = "",
     investment_style: str | None = None,
+    market_data: str = "",
 ) -> list[dict]:
     """构建对话消息列表"""
-    system = SYSTEM_PROMPT + f"\n\n【用户当前持仓】\n{positions_context}"
+    system = SYSTEM_PROMPT + f"\n\n【当前时间】{get_current_time_str()}\n\n【用户当前持仓】\n{positions_context}"
+    if market_data:
+        system += f"\n\n【以下为已获取的实时行情数据 — 请直接引用这些数据回答，无需要求用户提供】\n{market_data}"
     if investment_style and investment_style in INVESTMENT_STYLE_PROMPTS:
         system += INVESTMENT_STYLE_PROMPTS[investment_style]
     if search_context:
@@ -153,7 +204,7 @@ def _chat_with_deepseek(messages: list[dict], search_context: str = "") -> tuple
                 "content": messages[0]["content"] + f"\n\n【实时搜索资讯】\n{search_context}",
             }
         response = client.chat.completions.create(
-            model="deepseek-v4-pro",
+            model="deepseek-chat",
             messages=messages,
             temperature=0.7,
         )
@@ -232,18 +283,23 @@ def chat(
         names = [p["name"] for p in positions]
         search_context = get_realtime_market_context(positions)
 
+    # 千问和 DeepSeek 始终注入实时行情数据（无论是否开启联网搜索）
+    market_data = ""
+    if model in ("qwen", "deepseek") and positions:
+        market_data = build_market_data_table(positions)
+
     if model == "deepseek":
         return _chat_with_deepseek(
-            build_chat_messages(positions_context, history, user_message, search_context, investment_style),
+            build_chat_messages(positions_context, history, user_message, search_context, investment_style, market_data),
             search_context,
         )
     if model == "gemini":
         return _chat_with_gemini(
-            build_chat_messages(positions_context, history, user_message, search_context, investment_style),
+            build_chat_messages(positions_context, history, user_message, search_context, investment_style, market_data),
             search_context,
         )
     return _chat_with_qwen(
-        build_chat_messages(positions_context, history, user_message, search_context, investment_style),
+        build_chat_messages(positions_context, history, user_message, search_context, investment_style, market_data),
         enable_search=enable_search,
     )
 
@@ -264,7 +320,14 @@ def chat_stream(
     if enable_search and positions:
         search_context = get_realtime_market_context(positions)
 
-    messages = build_chat_messages(positions_context, history, user_message, search_context, investment_style)
+    # 千问和 DeepSeek 始终注入实时行情数据（无论是否开启联网搜索）
+    market_data = ""
+    if model in ("qwen", "deepseek") and positions:
+        market_data = build_market_data_table(positions)
+
+    messages = build_chat_messages(
+        positions_context, history, user_message, search_context, investment_style, market_data
+    )
 
     if model == "deepseek":
         yield from _stream_deepseek(messages, search_context)
@@ -275,10 +338,9 @@ def chat_stream(
 
 
 def _stream_qwen(messages: list[dict], enable_search: bool = False):
-    """千问流式对话"""
+    """千问流式对话 — DashScope 流式返回的是累积内容，需要 yield 增量 delta"""
     try:
         import dashscope
-        from dashscope.api_entities.dashscope_response import GenerationResponse
         dashscope.api_key = DASHSCOPE_API_KEY
         kwargs = {
             "model": "qwen-max",
@@ -286,6 +348,7 @@ def _stream_qwen(messages: list[dict], enable_search: bool = False):
             "temperature": 0.7,
             "result_format": "message",
             "stream": True,
+            "incremental_output": True,
         }
         if enable_search:
             kwargs["enable_search"] = True
@@ -318,7 +381,7 @@ def _stream_deepseek(messages: list[dict], search_context: str = ""):
                 "content": messages[0]["content"] + f"\n\n【实时搜索资讯】\n{search_context}",
             }
         stream = client.chat.completions.create(
-            model="deepseek-v4-pro",
+            model="deepseek-chat",
             messages=messages,
             temperature=0.7,
             stream=True,
@@ -354,11 +417,6 @@ def _stream_gemini(messages: list[dict], search_context: str = ""):
                 "role": "user" if m["role"] == "user" else "model",
                 "parts": [{"text": m["content"]}],
             })
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-        )
-        # Gemini SDK 流式：使用 generate_content_stream
         for chunk in client.models.generate_content_stream(
             model="gemini-2.5-flash",
             contents=contents,

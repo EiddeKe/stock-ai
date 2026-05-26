@@ -95,8 +95,8 @@ export default function UsersPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                {["ID", "账号", "昵称", "注册时间", "操作"].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 4 ? "right" : "left", padding: "12px 16px", color: "var(--text-muted)", fontWeight: 600, fontSize: 12 }}>{h}</th>
+                {["ID", "账号", "昵称", "注册时间", "最近登录", "操作"].map((h, i) => (
+                  <th key={h} style={{ textAlign: i === 5 ? "right" : "left", padding: "12px 16px", color: "var(--text-muted)", fontWeight: 600, fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -107,6 +107,7 @@ export default function UsersPage() {
                   <td style={{ padding: "12px 16px", color: "var(--text-primary)", fontWeight: 500 }}>{u.account}</td>
                   <td style={{ padding: "12px 16px", color: "var(--text-primary)" }}>{u.nickname}</td>
                   <td style={{ padding: "12px 16px", color: "var(--text-muted)", fontSize: 13 }}>{u.created_at}</td>
+                  <td style={{ padding: "12px 16px", color: u.last_login ? "var(--text-primary)" : "var(--text-muted)", fontSize: 13 }}>{u.last_login ? u.last_login : "从未登录"}</td>
                   <td style={{ padding: "12px 16px", textAlign: "right" }}>
                     <button onClick={() => openEdit(u)} style={{ marginRight: 8, fontSize: 13, padding: "4px 12px", borderRadius: 6, cursor: "pointer", background: "var(--accent)", color: "#fff", border: "none" }}>编辑</button>
                     <button onClick={() => handleDelete(u)} style={{ fontSize: 13, padding: "4px 12px", borderRadius: 6, cursor: "pointer", background: "rgba(239, 68, 68, 0.15)", color: "var(--up)", border: "1px solid rgba(239, 68, 68, 0.3)" }}>删除</button>

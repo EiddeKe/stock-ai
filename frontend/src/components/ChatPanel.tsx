@@ -13,9 +13,10 @@ interface Props {
   model: "qwen" | "deepseek" | "gemini";
   enableSearch: boolean;
   onEnableSearchChange: (v: boolean) => void;
+  onStreamingLength?: (len: number) => void;
 }
 
-export default function ChatPanel({ model, enableSearch, onEnableSearchChange }: Props) {
+export default function ChatPanel({ model, enableSearch, onEnableSearchChange, onStreamingLength }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,7 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
   const containerRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef(model);
   const streamController = useRef<AbortController | null>(null);
+  const shouldAutoScroll = useRef(true);
 
   const fetchHistory = useCallback(async (m: "qwen" | "deepseek" | "gemini") => {
     try {
@@ -45,8 +47,28 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
     fetchHistory(model);
   }, [model, fetchHistory]);
 
+  // 跟踪用户是否手动滚动过（离开底部）
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = containerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      shouldAutoScroll.current = nearBottom;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (streamingContent) {
+      // 流式输出中：仅当用户靠近底部时自动滚动，使用 instant 避免动画堆积
+      if (shouldAutoScroll.current) {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+    } else {
+      // 消息列表变化（非流式）：平滑滚动到底部
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, streamingContent]);
 
   const handleSend = async () => {
@@ -61,16 +83,23 @@ export default function ChatPanel({ model, enableSearch, onEnableSearchChange }:
     streamController.current = sendChatMessageStream(
       model, msg, enableSearch,
       (chunk) => {
-        setStreamingContent((prev) => prev + chunk);
+        setStreamingContent((prev) => {
+          const next = prev + chunk;
+          onStreamingLength?.(next.length);
+          return next;
+        });
       },
       () => {
         // 流式完成，将完整内容加入消息列表
         setStreamingContent("");
+        onStreamingLength?.(0);
         setLoading(false);
         // 刷新历史以获取保存的消息
         fetchHistory(model);
       },
       (error) => {
+        setStreamingContent("");
+        onStreamingLength?.(0);
         setMessages((prev) => [
           ...prev.slice(0, -1),
           { id: Date.now(), role: "user", content: msg, created_at: "" },

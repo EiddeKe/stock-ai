@@ -74,6 +74,7 @@ class UserItem(BaseModel):
     nickname: str
     created_at: str
     updated_at: Optional[str] = None
+    last_login: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -116,6 +117,7 @@ def list_users(
             UserItem(
                 id=u.id, account=u.account, nickname=u.nickname,
                 created_at=str(u.created_at), updated_at=str(u.updated_at) if u.updated_at else None,
+                last_login=str(u.last_login) if u.last_login else None,
             )
             for u in users
         ],
